@@ -31,11 +31,38 @@ public class SiteContent {
     @Lob
     private String heroSubtitle;
 
+    @Column(length = 800)
+    private String heroBackgroundUrl;
+
+    @Column(length = 200)
+    private String careersHeroTitle;
+
+    @Lob
+    private String careersHeroSubtitle;
+
+    @Column(length = 800)
+    private String careersHeroBackgroundUrl;
+
+    @Lob
+    private String navJson;
+
     @Column(length = 200)
     private String aboutTitle;
 
     @Lob
     private String aboutContent;
+
+    @Lob
+    private String joinKaopizerJson;
+
+    @Lob
+    private String testimonialsJson;
+
+    @Lob
+    private String cultureEventsJson;
+
+    @Column(length = 800)
+    private String ctaBackgroundUrl;
 
     @Column(length = 200)
     private String benefitsTitle;
@@ -43,10 +70,31 @@ public class SiteContent {
     @Lob
     private String benefitsJson;
 
+    @Lob
+    private String benefitsPageJson;
+
+    @Column(length = 200)
+    private String benefitsHeroTitle;
+
+    @Lob
+    private String benefitsHeroSubtitle;
+
+    @Column(length = 800)
+    private String benefitsHeroBackgroundUrl;
+
+    @Column(length = 800)
+    private String benefitsCtaBackgroundUrl;
+
     @Column(length = 200)
     private String rightsTitle;
 
     @Lob
     private String rightsJson;
+
+    @Lob
+    private String footerJson;
+
+    @Lob
+    private String sectionsJson;
 }
 

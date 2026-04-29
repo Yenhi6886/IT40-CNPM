@@ -38,6 +38,11 @@ public class AdminContentController {
         return contentService.listAllJobs();
     }
 
+    @GetMapping("/jobs/{id}")
+    public JobPostingDto getJob(@PathVariable long id) {
+        return contentService.getAdminJob(id);
+    }
+
     @PostMapping("/jobs")
     public JobPostingDto createJob(@RequestBody JobPostingDto dto) {
         return contentService.createJob(dto);

@@ -23,10 +23,22 @@ public class JobPosting {
     private String title;
 
     @Column(length = 200)
-    private String location;
+    private String location; // legacy (kept for backward compatibility)
 
     @Column(length = 120)
-    private String employmentType;
+    private String employmentType; // legacy (kept for backward compatibility)
+
+    @Column(length = 120)
+    private String applyStartDate;
+
+    @Column(length = 120)
+    private String applyEndDate;
+
+    @Column(length = 300)
+    private String address;
+
+    @Column(length = 20)
+    private String jobType; // IT / NON_IT
 
     @Column(length = 200)
     private String salary;
