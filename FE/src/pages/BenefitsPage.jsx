@@ -79,7 +79,6 @@ export default function BenefitsPage() {
       <SiteHeader site={site} />
 
       <main>
-        {/* Hero riêng cho trang Quyền lợi (giống layout trang chủ) */}
         <section
           className="relative"
           style={
@@ -167,7 +166,6 @@ export default function BenefitsPage() {
           </div>
         </section>
 
-        {/* Nội dung giữa giống layout ảnh */}
         <section className="border-t bg-white">
           <div className="mx-auto max-w-4xl px-4 py-14">
             {cards?.length ? (
@@ -217,7 +215,6 @@ export default function BenefitsPage() {
           </div>
         </section>
 
-        {/* KEEP INNOVATING (CTA) riêng cho trang Quyền lợi */}
         <section className="border-t bg-[#0b2d3a]">
           <div
             className="relative overflow-hidden"

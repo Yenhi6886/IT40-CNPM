@@ -135,7 +135,6 @@ export default function AdminDashboard() {
   const [careersPanel, setCareersPanel] = useState('hero') // dropdown: hero
   const [benefitsPanel, setBenefitsPanel] = useState('hero') // dropdown: hero/content/cta
 
-  // Home page structured state (admin-friendly inputs; saved as JSON strings in BE)
   const [sections, setSections] = useState({
     hero: true,
     about: false,
@@ -183,7 +182,6 @@ export default function AdminDashboard() {
     { title: 'Môi trường làm việc năng động', imageUrl: '', body: '' },
   ])
 
-  // Pagination state (2 items per page for repeatable sections)
   const [navPage, setNavPage] = useState(1)
   const [testimonialsPage, setTestimonialsPage] = useState(1)
   const [culturePage, setCulturePage] = useState(1)
@@ -268,7 +266,6 @@ export default function AdminDashboard() {
         setSite(s)
         setJobs(j || [])
 
-        // hydrate structured state from BE json fields
         const sectionObj = safeJson(s?.sectionsJson, null)
         if (sectionObj && typeof sectionObj === 'object' && !Array.isArray(sectionObj)) {
           setSections((prev) => ({ ...prev, ...sectionObj }))
@@ -477,7 +474,6 @@ export default function AdminDashboard() {
     setError(null)
     setNotice(null)
     try {
-      // validations
       if (sections.testimonials) {
         const cleaned = (testimonialsItems || []).map((x) => ({
           imageUrl: String(x.imageUrl || '').trim(),

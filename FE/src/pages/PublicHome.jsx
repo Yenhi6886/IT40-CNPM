@@ -61,7 +61,6 @@ function renderJobDescription(value) {
 function renderRichHtml(value) {
   const text = String(value || '').trim()
   if (!text) return ''
-  // If already HTML -> sanitize; else treat as plain text with paragraphs.
   const html = /<\/?[a-z][\s\S]*>/i.test(text)
     ? text
     : text
@@ -158,7 +157,6 @@ export default function PublicHome() {
     if (!cTabs.length) return []
     return Array.from({ length: visibleCultureCount }, (_, i) => (cultureStart + i) % cTabs.length)
   }, [cTabs.length, cultureStart, visibleCultureCount])
-  // footer rendering moved to shared SiteFooter
 
   useEffect(() => {
     if (!cTabs.length) {
@@ -617,7 +615,6 @@ export default function PublicHome() {
           </section>
         ) : null}
 
-        {/* CTA sau Văn hoá - Sự kiện (link tới "Ứng tuyển ngay") */}
         <section className="border-t bg-[#0b2d3a]">
           <div
             className="relative overflow-hidden"

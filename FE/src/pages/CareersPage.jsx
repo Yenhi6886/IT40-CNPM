@@ -360,7 +360,6 @@ export default function CareersPage() {
       <SiteHeader site={site} />
 
       <main>
-        {/* Hero giống trang chủ */}
         <section
           className="relative"
           style={
@@ -493,7 +492,6 @@ export default function CareersPage() {
           </section>
         ) : null}
 
-        {/* Vị trí IT */}
         <section id="jobs" className="border-t bg-white">
           <div className="mx-auto max-w-6xl px-4 py-14">
             <h2 className="text-center text-4xl font-extrabold tracking-tight">
@@ -517,7 +515,6 @@ export default function CareersPage() {
           </div>
         </section>
 
-        {/* Vị trí Non-IT */}
         <section className="border-t">
           <div className="mx-auto max-w-6xl px-4 py-14">
             <h2 className="text-center text-4xl font-extrabold tracking-tight">
@@ -541,7 +538,6 @@ export default function CareersPage() {
           </div>
         </section>
 
-        {/* Ứng tuyển ngay */}
         <section id="apply" className="border-t bg-white">
           <div className="mx-auto max-w-6xl px-4 py-14">
             <h2 className="text-center text-4xl font-extrabold tracking-tight">

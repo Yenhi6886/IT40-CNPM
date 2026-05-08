@@ -48,7 +48,6 @@ export default function JobDetailPage() {
   const [job, setJob] = useState(null)
   const [error, setError] = useState(null)
 
-  // Apply form (demo)
   const [applyName, setApplyName] = useState('')
   const [applyEmail, setApplyEmail] = useState('')
   const [applyPhone, setApplyPhone] = useState('')
@@ -136,7 +135,6 @@ export default function JobDetailPage() {
           </section>
         ) : null}
 
-        {/* Apply section (demo giống /careers) */}
         <section id="apply" className="border-t bg-white">
           <div className="mx-auto max-w-6xl px-4 py-14">
             <h2 className="text-center text-4xl font-extrabold tracking-tight">
