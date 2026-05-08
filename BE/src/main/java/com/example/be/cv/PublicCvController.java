@@ -69,6 +69,7 @@ public class PublicCvController {
         app.setSource(source == null ? null : source.trim());
         app.setCvOriginalName(cleanName.isBlank() ? "cv" : cleanName);
         app.setCvStoredPath(target.toString());
+        app.setStatus("XEM_XET");
         cvRepo.save(app);
 
         return ResponseEntity.ok(Map.of("message", "OK"));

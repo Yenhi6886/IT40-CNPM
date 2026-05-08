@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Menu, X } from 'lucide-react'
 
 function safeJsonArray(text) {
   try {
@@ -23,6 +25,7 @@ function normalizeNavHref(href) {
 }
 
 export default function SiteHeader({ site }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const companyName = site?.companyName || 'Savytech'
   const nav = safeJsonArray(site?.navJson)
   const navItems = nav?.length
@@ -41,8 +44,8 @@ export default function SiteHeader({ site }) {
     .map((x) => ({ ...x, href: normalizeNavHref(x?.href) }))
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/70 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+    <header className="sticky top-0 z-40 border-b border-white/30 bg-white/60 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-white/45">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
         <Link to="/" className="flex items-center gap-3">
           {site?.logoUrl ? (
             <img src={site.logoUrl} alt={companyName} className="h-8 w-8 rounded-md object-cover" />
@@ -52,13 +55,19 @@ export default function SiteHeader({ site }) {
             </div>
           )}
           <div className="leading-tight">
-            <div className="text-sm font-semibold">{companyName}</div>
+            <div className="bg-gradient-to-r from-sky-600 via-cyan-500 to-blue-600 bg-clip-text text-xl font-extrabold tracking-tight text-transparent md:text-2xl">
+              {companyName}
+            </div>
           </div>
         </Link>
 
-        <nav className="hidden items-center gap-6 text-sm md:flex">
+        <nav className="hidden items-center gap-3 text-base md:flex">
           {headerNavItems.map((item, idx) => (
-            <Link key={idx} className="hover:text-primary" to={item.href || '/'}>
+            <Link
+              key={idx}
+              className="rounded-md px-3 py-2 font-medium text-foreground/90 transition-colors hover:bg-muted hover:text-primary"
+              to={item.href || '/'}
+            >
               {item.label || 'Menu'}
             </Link>
           ))}
@@ -71,8 +80,32 @@ export default function SiteHeader({ site }) {
           >
             Ứng tuyển ngay
           </Link>
+          <button
+            type="button"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background/80 text-foreground md:hidden"
+            aria-label={mobileMenuOpen ? 'Đóng menu' : 'Mở menu'}
+            onClick={() => setMobileMenuOpen((v) => !v)}
+          >
+            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
       </div>
+      {mobileMenuOpen ? (
+        <div className="border-t border-white/30 bg-white/90 px-4 py-3 backdrop-blur md:hidden">
+          <nav className="flex flex-col gap-1">
+            {headerNavItems.map((item, idx) => (
+              <Link
+                key={idx}
+                className="rounded-md px-3 py-2 text-sm font-medium text-foreground/90 transition-colors hover:bg-muted hover:text-primary"
+                to={item.href || '/'}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                {item.label || 'Menu'}
+              </Link>
+            ))}
+          </nav>
+        </div>
+      ) : null}
     </header>
   )
 }

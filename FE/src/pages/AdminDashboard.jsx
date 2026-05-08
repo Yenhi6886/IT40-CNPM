@@ -64,6 +64,10 @@ function jsonArrayFromList(list) {
   return JSON.stringify(arr)
 }
 
+function normalizeText(value) {
+  return String(value || '').toLowerCase().trim()
+}
+
 function UploadField({ value, onChange, onUpload, uploading, placeholder }) {
   const fileRef = useRef(null)
   return (
@@ -186,9 +190,14 @@ export default function AdminDashboard() {
   const [footerPage, setFooterPage] = useState(1)
   const [benefitsCardsPage, setBenefitsCardsPage] = useState(1)
   const [jobsPage, setJobsPage] = useState(1)
+  const [jobKeyword, setJobKeyword] = useState('')
+  const [jobStatusFilter, setJobStatusFilter] = useState('all') // all / published / draft
+  const [jobTypeFilter, setJobTypeFilter] = useState('all') // all / IT / NON_IT
+  const [jobAddressFilter, setJobAddressFilter] = useState('')
   const [cvs, setCvs] = useState([])
   const [loadingCvs, setLoadingCvs] = useState(false)
   const [cvsPage, setCvsPage] = useState(1)
+  const [cvStatusFilter, setCvStatusFilter] = useState('all')
   const [jobDeleteModal, setJobDeleteModal] = useState({ open: false, job: null })
   const [deletingJob, setDeletingJob] = useState(false)
 
@@ -389,6 +398,79 @@ export default function AdminDashboard() {
     }
   }, [active, token, nav])
 
+  const filteredJobs = useMemo(() => {
+    const keyword = normalizeText(jobKeyword)
+    const addressKeyword = normalizeText(jobAddressFilter)
+    return (jobs || []).filter((job) => {
+      if (jobStatusFilter === 'published' && !job?.published) return false
+      if (jobStatusFilter === 'draft' && job?.published) return false
+
+      if (jobTypeFilter !== 'all' && String(job?.jobType || '').toUpperCase() !== jobTypeFilter) return false
+
+      if (keyword) {
+        const haystack = [
+          job?.title,
+          job?.address,
+          job?.salary,
+          job?.description,
+          job?.applyStartDate,
+          job?.applyEndDate,
+        ]
+          .map((x) => normalizeText(x))
+          .join(' ')
+        if (!haystack.includes(keyword)) return false
+      }
+
+      if (addressKeyword && !normalizeText(job?.address).includes(addressKeyword)) return false
+
+      return true
+    })
+  }, [jobs, jobKeyword, jobStatusFilter, jobTypeFilter, jobAddressFilter])
+
+  const jobsTotalPages = Math.max(1, Math.ceil((filteredJobs.length || 0) / 10))
+  const jobsPageSafe = Math.min(Math.max(1, jobsPage), jobsTotalPages)
+  const pagedJobs = useMemo(
+    () => filteredJobs.slice((jobsPageSafe - 1) * 10, jobsPageSafe * 10),
+    [filteredJobs, jobsPageSafe],
+  )
+
+  useEffect(() => {
+    setJobsPage(1)
+  }, [jobKeyword, jobStatusFilter, jobTypeFilter, jobAddressFilter])
+
+  const filteredCvs = useMemo(() => {
+    if (cvStatusFilter === 'all') return cvs || []
+    return (cvs || []).filter((x) => String(x?.status || 'XEM_XET').toUpperCase() === cvStatusFilter)
+  }, [cvs, cvStatusFilter])
+
+  const cvsTotalPages = Math.max(1, Math.ceil((filteredCvs.length || 0) / 10))
+  const cvsPageSafe = Math.min(Math.max(1, cvsPage), cvsTotalPages)
+  const pagedCvs = useMemo(
+    () => filteredCvs.slice((cvsPageSafe - 1) * 10, cvsPageSafe * 10),
+    [filteredCvs, cvsPageSafe],
+  )
+
+  useEffect(() => {
+    setCvsPage(1)
+  }, [cvStatusFilter])
+
+  function cvStatusLabel(status) {
+    const key = String(status || 'XEM_XET').toUpperCase()
+    if (key === 'PHONG_VAN') return 'Phỏng vấn'
+    if (key === 'LOAI') return 'Loại'
+    return 'Xem xét'
+  }
+
+  async function updateCvStatus(id, status) {
+    try {
+      const updated = await adminApi.updateCvStatus(token, id, status)
+      setCvs((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
+      notifySuccess(`Đã gán loại CV: "${cvStatusLabel(status)}".`)
+    } catch (err) {
+      notifyError(err?.message || 'Cập nhật trạng thái CV thất bại')
+    }
+  }
+
   async function saveSite() {
     if (!site) return
     setSavingSite(true)
@@ -573,13 +655,20 @@ export default function AdminDashboard() {
     nav('/admin/login', { replace: true })
   }
 
+  const adminNavItems = [
+    { id: 'site', label: 'Nội dung trang', path: '/admin/site' },
+    { id: 'jobs', label: 'Tuyển dụng', path: '/admin/jobs' },
+    { id: 'job-edit', label: 'Thêm/Sửa job', path: '/admin/job-edit' },
+    { id: 'cv', label: 'Quản lý CV', path: '/admin/cv' },
+  ]
+
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
           <div>
             <div className="text-sm text-muted-foreground">Admin</div>
-            <div className="text-lg font-semibold">{site?.companyName || 'Savytech'}</div>
+            <div className="text-xl font-semibold tracking-tight">{site?.companyName || 'Savytech'}</div>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" asChild>
@@ -594,7 +683,7 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="mx-auto max-w-7xl px-4 py-8">
         {jobDeleteModal?.open ? (
           <div className="fixed inset-0 z-[80]">
             <div
@@ -634,48 +723,46 @@ export default function AdminDashboard() {
           </div>
         ) : null}
 
-        <div className="mb-6 flex flex-wrap gap-2">
-          <Button
-            variant={active === 'site' ? 'default' : 'outline'}
-            onClick={() => nav('/admin/site')}
-          >
-            Nội dung trang
-          </Button>
-          <Button
-            variant={active === 'jobs' ? 'default' : 'outline'}
-            onClick={() => nav('/admin/jobs')}
-          >
-            Tuyển dụng
-          </Button>
-          <Button
-            variant={active === 'job-edit' ? 'default' : 'outline'}
-            onClick={() => nav('/admin/job-edit')}
-          >
-            Thêm/Sửa job
-          </Button>
-          <Button variant={active === 'cv' ? 'default' : 'outline'} onClick={() => nav('/admin/cv')}>
-            Quản lý CV
-          </Button>
-        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_1fr]">
+          <aside className="h-fit rounded-xl border bg-card p-3 lg:sticky lg:top-24">
+            <div className="mb-3 px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Điều hướng
+            </div>
+            <div className="space-y-1">
+              {adminNavItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => nav(item.path)}
+                  className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
+                    active === item.id ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </aside>
 
-        {error ? (
-          <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-            {error}
-          </div>
-        ) : null}
+          <section className="space-y-4">
+            {error ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+                {error}
+              </div>
+            ) : null}
 
-        {notice ? (
-          <div
-            ref={noticeRef}
-            className={`mb-6 rounded-lg border p-4 text-sm ${
-              notice.type === 'success'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                : 'border-destructive/30 bg-destructive/10 text-destructive'
-            }`}
-          >
-            {notice.message}
-          </div>
-        ) : null}
+            {notice ? (
+              <div
+                ref={noticeRef}
+                className={`rounded-lg border p-4 text-sm ${
+                  notice.type === 'success'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-destructive/30 bg-destructive/10 text-destructive'
+                }`}
+              >
+                {notice.message}
+              </div>
+            ) : null}
 
         {active === 'site' ? (
           <Card>
@@ -1637,11 +1724,70 @@ export default function AdminDashboard() {
               <CardDescription>Chỉ job có Published = true mới hiện ở trang user.</CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="mb-4 grid grid-cols-1 gap-3 rounded-lg border bg-muted/10 p-3 md:grid-cols-2 xl:grid-cols-5">
+                <div className="space-y-1 md:col-span-2 xl:col-span-2">
+                  <div className="text-xs font-medium text-muted-foreground">Từ khóa</div>
+                  <Input
+                    value={jobKeyword}
+                    onChange={(e) => setJobKeyword(e.target.value)}
+                    placeholder="Tiêu đề, địa chỉ, lương..."
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs font-medium text-muted-foreground">Trạng thái</div>
+                  <select
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    value={jobStatusFilter}
+                    onChange={(e) => setJobStatusFilter(e.target.value)}
+                  >
+                    <option value="all">Tất cả</option>
+                    <option value="published">Published</option>
+                    <option value="draft">Draft</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs font-medium text-muted-foreground">Loại job</div>
+                  <select
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    value={jobTypeFilter}
+                    onChange={(e) => setJobTypeFilter(e.target.value)}
+                  >
+                    <option value="all">Tất cả</option>
+                    <option value="IT">IT</option>
+                    <option value="NON_IT">NON-IT</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs font-medium text-muted-foreground">Địa chỉ</div>
+                  <Input
+                    value={jobAddressFilter}
+                    onChange={(e) => setJobAddressFilter(e.target.value)}
+                    placeholder="Hà Nội, Đà Nẵng..."
+                  />
+                </div>
+              </div>
+
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+                <div className="text-muted-foreground">
+                  Tìm thấy <b className="text-foreground">{filteredJobs.length}</b> vị trí
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setJobKeyword('')
+                    setJobStatusFilter('all')
+                    setJobTypeFilter('all')
+                    setJobAddressFilter('')
+                  }}
+                >
+                  Xóa bộ lọc
+                </Button>
+              </div>
+
               <div className="space-y-3">
-                {jobs?.length ? (
-                  jobs
-                    .slice((clampPage(jobsPage, jobs.length) - 1) * 10, clampPage(jobsPage, jobs.length) * 10)
-                    .map((j) => (
+                {pagedJobs.length ? (
+                  pagedJobs.map((j) => (
                     <div
                       key={j.id}
                       className="flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:items-center md:justify-between"
@@ -1706,7 +1852,7 @@ export default function AdminDashboard() {
                   ))
                 ) : (
                   <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                    Chưa có job nào. Chọn “Thêm/Sửa job” để tạo mới.
+                    Không có job phù hợp với bộ lọc hiện tại.
                   </div>
                 )}
               </div>
@@ -1714,20 +1860,19 @@ export default function AdminDashboard() {
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={clampPage(jobsPage, jobs.length) <= 1}
-                  onClick={() => setJobsPage((p) => clampPage(p - 1, jobs.length))}
+                  disabled={jobsPageSafe <= 1}
+                  onClick={() => setJobsPage((p) => Math.max(1, p - 1))}
                 >
                   ‹
                 </Button>
                 <div className="px-2 text-muted-foreground">
-                  Trang <b className="text-foreground">{clampPage(jobsPage, jobs.length)}</b> /{' '}
-                  {Math.max(1, Math.ceil((jobs.length || 0) / 10))}
+                  Trang <b className="text-foreground">{jobsPageSafe}</b> / {jobsTotalPages}
                 </div>
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={clampPage(jobsPage, jobs.length) >= Math.max(1, Math.ceil((jobs.length || 0) / 10))}
-                  onClick={() => setJobsPage((p) => clampPage(p + 1, jobs.length))}
+                  disabled={jobsPageSafe >= jobsTotalPages}
+                  onClick={() => setJobsPage((p) => Math.min(jobsTotalPages, p + 1))}
                 >
                   ›
                 </Button>
@@ -1860,15 +2005,34 @@ export default function AdminDashboard() {
           <Card>
             <CardHeader>
               <CardTitle>Quản lý CV</CardTitle>
-              <CardDescription>Danh sách CV ứng tuyển người dùng gửi lên.</CardDescription>
+              <CardDescription>
+                Danh sách CV ứng tuyển, phân chia theo 3 loại: Xem xét / Phỏng vấn / Loại.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {loadingCvs ? <div className="text-sm text-muted-foreground">Đang tải…</div> : null}
 
+              <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border bg-muted/10 p-3">
+                <div className="space-y-1">
+                  <div className="text-xs font-medium text-muted-foreground">Lọc theo loại CV</div>
+                  <select
+                    className="h-10 min-w-44 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    value={cvStatusFilter}
+                    onChange={(e) => setCvStatusFilter(e.target.value)}
+                  >
+                    <option value="all">Tất cả</option>
+                    <option value="XEM_XET">Xem xét</option>
+                    <option value="PHONG_VAN">Phỏng vấn</option>
+                    <option value="LOAI">Loại</option>
+                  </select>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Tổng: <b className="text-foreground">{filteredCvs.length}</b> CV
+                </div>
+              </div>
+
               <div className="space-y-3">
-                {cvs
-                  .slice((Math.min(Math.max(1, cvsPage), Math.max(1, Math.ceil((cvs.length || 0) / 10))) - 1) * 10, Math.min(Math.max(1, cvsPage), Math.max(1, Math.ceil((cvs.length || 0) / 10))) * 10)
-                  .map((x) => (
+                {pagedCvs.map((x) => (
                     <div
                       key={x.id}
                       className="flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:items-center md:justify-between"
@@ -1880,6 +2044,11 @@ export default function AdminDashboard() {
                         <div className="mt-1 text-sm text-muted-foreground">
                           {x.email} • {x.phone} {x.source ? `• ${x.source}` : ''}{' '}
                           {x.createdAt ? `• ${new Date(x.createdAt).toLocaleString()}` : ''}
+                        </div>
+                        <div className="mt-2">
+                          <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                            Loại: {cvStatusLabel(x.status)}
+                          </span>
                         </div>
                         <div className="mt-2 text-xs text-muted-foreground">
                           <div className="truncate">
@@ -1913,13 +2082,37 @@ export default function AdminDashboard() {
                         >
                           Tải CV
                         </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={String(x.status || 'XEM_XET').toUpperCase() === 'XEM_XET'}
+                          onClick={() => updateCvStatus(x.id, 'XEM_XET')}
+                        >
+                          Gán: Xem xét
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={String(x.status || 'XEM_XET').toUpperCase() === 'PHONG_VAN'}
+                          onClick={() => updateCvStatus(x.id, 'PHONG_VAN')}
+                        >
+                          Gán: Phỏng vấn
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          disabled={String(x.status || 'XEM_XET').toUpperCase() === 'LOAI'}
+                          onClick={() => updateCvStatus(x.id, 'LOAI')}
+                        >
+                          Gán: Loại
+                        </Button>
                       </div>
                     </div>
                   ))}
 
-                {!cvs.length && !loadingCvs ? (
+                {!pagedCvs.length && !loadingCvs ? (
                   <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                    Chưa có CV nào.
+                    Không có CV phù hợp bộ lọc hiện tại.
                   </div>
                 ) : null}
               </div>
@@ -1928,23 +2121,19 @@ export default function AdminDashboard() {
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={Math.min(Math.max(1, cvsPage), Math.max(1, Math.ceil((cvs.length || 0) / 10))) <= 1}
+                  disabled={cvsPageSafe <= 1}
                   onClick={() => setCvsPage((p) => Math.max(1, p - 1))}
                 >
                   ‹
                 </Button>
                 <div className="px-2 text-muted-foreground">
-                  Trang <b className="text-foreground">{Math.min(Math.max(1, cvsPage), Math.max(1, Math.ceil((cvs.length || 0) / 10)))}</b> /{' '}
-                  {Math.max(1, Math.ceil((cvs.length || 0) / 10))}
+                  Trang <b className="text-foreground">{cvsPageSafe}</b> / {cvsTotalPages}
                 </div>
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={
-                    Math.min(Math.max(1, cvsPage), Math.max(1, Math.ceil((cvs.length || 0) / 10))) >=
-                    Math.max(1, Math.ceil((cvs.length || 0) / 10))
-                  }
-                  onClick={() => setCvsPage((p) => p + 1)}
+                  disabled={cvsPageSafe >= cvsTotalPages}
+                  onClick={() => setCvsPage((p) => Math.min(cvsTotalPages, p + 1))}
                 >
                   ›
                 </Button>
@@ -1952,6 +2141,8 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         ) : null}
+          </section>
+        </div>
       </main>
     </div>
   )

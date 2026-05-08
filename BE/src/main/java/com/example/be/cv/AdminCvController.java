@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -12,6 +13,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -49,6 +52,15 @@ public class AdminCvController {
             .body(res);
     }
 
+    @PutMapping("/{id}/status")
+    public CvApplicationDto updateStatus(@PathVariable long id, @RequestBody Map<String, String> body) {
+        CvApplication app = cvRepo.findById(id).orElseThrow(() -> new IllegalArgumentException("CV not found"));
+        String next = normalizeStatus(body == null ? null : body.get("status"));
+        app.setStatus(next);
+        CvApplication saved = cvRepo.save(app);
+        return toDto(saved);
+    }
+
     private CvApplicationDto toDto(CvApplication a) {
         return new CvApplicationDto(
             a.getId(),
@@ -60,8 +72,17 @@ public class AdminCvController {
             a.getSource(),
             a.getCvOriginalName(),
             a.getCvStoredPath(),
+            normalizeStatus(a.getStatus()),
             a.getCreatedAt()
         );
+    }
+
+    private String normalizeStatus(String raw) {
+        String v = String.valueOf(raw == null ? "" : raw).trim().toUpperCase();
+        return switch (v) {
+            case "PHONG_VAN", "LOAI", "XEM_XET" -> v;
+            default -> "XEM_XET";
+        };
     }
 }
 

@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import DOMPurify from 'dompurify'
 import { publicApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
+import { useNavigate } from 'react-router-dom'
 
 function safeJsonArray(text) {
   try {
@@ -27,10 +29,12 @@ function renderRichHtml(value) {
 }
 
 export default function BenefitsPage() {
+  const navigate = useNavigate()
   const [site, setSite] = useState(null)
   const [error, setError] = useState(null)
   const [regionOpen, setRegionOpen] = useState(false)
   const [regionValue, setRegionValue] = useState('')
+  const [jobKeyword, setJobKeyword] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -61,6 +65,14 @@ export default function BenefitsPage() {
   }, [])
 
   const cards = useMemo(() => safeJsonArray(site?.benefitsPageJson), [site?.benefitsPageJson])
+
+  function goToCareersWithFilters() {
+    const params = new URLSearchParams()
+    if (jobKeyword.trim()) params.set('keyword', jobKeyword.trim())
+    if (regionValue.trim()) params.set('region', regionValue.trim())
+    const query = params.toString()
+    navigate(query ? `/careers?${query}` : '/careers')
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -97,25 +109,29 @@ export default function BenefitsPage() {
                 </p>
               ) : null}
 
-              <div className="mx-auto mt-8 flex max-w-3xl items-center gap-3 rounded-full bg-white/95 p-3 shadow-lg">
-                <div className="flex flex-1 items-center gap-2 px-4 text-sm text-muted-foreground">
-                  <span className="hidden sm:inline">Công việc:</span>
+              <div className="mx-auto mt-8 grid w-full max-w-5xl grid-cols-1 gap-3 rounded-2xl border border-white/20 bg-white/95 p-4 md:grid-cols-[1.5fr_1.25fr_auto]">
+                <div className="flex items-center gap-2 rounded-lg border bg-white px-3 text-sm text-muted-foreground">
+                  <span className="hidden whitespace-nowrap sm:inline">Công việc</span>
                   <input
-                    className="w-full bg-transparent text-foreground outline-none"
+                    className="h-11 w-full bg-transparent text-foreground outline-none"
                     placeholder="Tìm công việc"
                     aria-label="Tìm công việc"
+                    value={jobKeyword}
+                    onChange={(e) => setJobKeyword(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') goToCareersWithFilters()
+                    }}
                   />
                 </div>
-                <div className="h-8 w-px bg-border/70" />
-                <div className="relative flex flex-1 items-center gap-2 px-4 text-sm text-muted-foreground" data-region-dropdown>
-                  <span className="hidden sm:inline">Khu vực:</span>
+                <div className="relative flex items-center gap-2 rounded-lg border bg-white px-3 text-sm text-muted-foreground" data-region-dropdown>
+                  <span className="hidden whitespace-nowrap sm:inline">Khu vực</span>
                   <button
                     type="button"
-                    className="flex w-full items-center justify-between gap-2 bg-transparent text-left text-foreground outline-none"
+                    className="flex h-11 w-full items-center justify-between gap-2 bg-transparent text-left text-foreground outline-none"
                     onClick={() => setRegionOpen((v) => !v)}
                     aria-label="Chọn khu vực"
                   >
-                    <span className={`${regionValue ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    <span className={`whitespace-nowrap ${regionValue ? 'text-foreground' : 'text-muted-foreground'}`}>
                       {regionValue || 'Tìm theo khu vực'}
                     </span>
                     <span className="text-muted-foreground">▾</span>
@@ -142,8 +158,8 @@ export default function BenefitsPage() {
                     </div>
                   ) : null}
                 </div>
-                <Button className="h-11 w-11 rounded-full p-0" aria-label="Search">
-                  🔍
+                <Button className="h-11 rounded-lg px-5" aria-label="Search" onClick={goToCareersWithFilters}>
+                  Tìm kiếm
                 </Button>
               </div>
               {error ? <p className="mt-4 text-sm text-red-200">Lỗi: {error}</p> : null}
@@ -155,26 +171,42 @@ export default function BenefitsPage() {
         <section className="border-t bg-white">
           <div className="mx-auto max-w-4xl px-4 py-14">
             {cards?.length ? (
-              <div className="space-y-14">
+              <div className="space-y-8">
                 {cards.map((c, idx) => (
-                  <div key={idx} className="text-center">
-                    <h2 className="text-xl font-semibold tracking-tight md:text-2xl">{c?.title || 'Tiêu đề'}</h2>
-                    <div className="mt-5 overflow-hidden rounded-2xl border bg-muted/20">
-                      {c?.imageUrl ? (
-                        <img src={c.imageUrl} alt="" className="w-full object-cover" />
-                      ) : (
-                        <div className="grid aspect-[16/7] place-items-center text-sm text-muted-foreground">
-                          Ảnh (admin upload)
-                        </div>
-                      )}
+                  <Card key={idx} className="overflow-hidden border-border/70">
+                    <div className="grid grid-cols-1 md:grid-cols-[1.1fr_1fr]">
+                      <div className="bg-muted/20">
+                        {c?.imageUrl ? (
+                          <img
+                            src={c.imageUrl}
+                            alt={c?.title || 'Bài viết quyền lợi'}
+                            className="h-full min-h-56 w-full object-cover"
+                          />
+                        ) : (
+                          <div className="grid h-full min-h-56 place-items-center text-sm text-muted-foreground">
+                            Ảnh (admin upload)
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col justify-center">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-xl tracking-tight md:text-2xl">
+                            {c?.title || 'Tiêu đề'}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {c?.body ? (
+                            <div
+                              className="ql-editor job-rich-content p-0 text-sm leading-7 text-foreground/85"
+                              dangerouslySetInnerHTML={{ __html: renderRichHtml(c.body) }}
+                            />
+                          ) : (
+                            <div className="text-sm text-muted-foreground">Nội dung đang được cập nhật.</div>
+                          )}
+                        </CardContent>
+                      </div>
                     </div>
-                    {c?.body ? (
-                      <div
-                        className="mx-auto mt-5 max-w-3xl ql-editor job-rich-content p-0 text-left text-sm leading-6 text-muted-foreground"
-                        dangerouslySetInnerHTML={{ __html: renderRichHtml(c.body) }}
-                      />
-                    ) : null}
-                  </div>
+                  </Card>
                 ))}
               </div>
             ) : (

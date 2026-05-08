@@ -12,6 +12,7 @@ public record CvApplicationDto(
     String source,
     String cvOriginalName,
     String cvStoredPath,
+    String status,
     Instant createdAt
 ) {}
 

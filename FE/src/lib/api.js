@@ -97,6 +97,8 @@ export const adminApi = {
   deleteJob: (token, id) => request(`/api/admin/jobs/${id}`, { method: 'DELETE', token }),
   cvs: (token) => request('/api/admin/cv', { token }),
   cv: (token, id) => request(`/api/admin/cv/${id}`, { token }),
+  updateCvStatus: (token, id, status) =>
+    request(`/api/admin/cv/${id}/status`, { method: 'PUT', token, body: { status } }),
   cvDownloadUrl: (id) => `/api/admin/cv/${id}/download`,
   downloadCv: (token, id) => downloadBlob(`/api/admin/cv/${id}/download`, { token }),
 }

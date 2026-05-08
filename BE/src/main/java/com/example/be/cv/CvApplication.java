@@ -44,6 +44,9 @@ public class CvApplication {
     @Column(nullable = false, length = 500)
     private String cvStoredPath;
 
+    @Column(length = 30)
+    private String status;
+
     @CreationTimestamp
     private Instant createdAt;
 }

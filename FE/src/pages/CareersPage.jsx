@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import DOMPurify from 'dompurify'
 import { publicApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Link } from 'react-router-dom'
 import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Toast from '@/components/Toast'
+import { BriefcaseBusiness, CalendarDays, MapPin } from 'lucide-react'
 
 function safeJsonArray(text) {
   try {
@@ -143,6 +145,7 @@ export default function CareersPage() {
   const [nonItPage, setNonItPage] = useState(1)
   const [regionOpen, setRegionOpen] = useState(false)
   const [regionValue, setRegionValue] = useState('')
+  const [jobKeyword, setJobKeyword] = useState('')
   const [applyName, setApplyName] = useState('')
   const [applyEmail, setApplyEmail] = useState('')
   const [applyPhone, setApplyPhone] = useState('')
@@ -175,6 +178,9 @@ export default function CareersPage() {
     const raw = params.get('jobId')
     const id = raw ? Number(raw) : null
     if (id && Number.isFinite(id)) setSelectedJobId(id)
+    else setSelectedJobId(null)
+    setJobKeyword(params.get('keyword') || '')
+    setRegionValue(params.get('region') || '')
   }, [location.search])
 
   useEffect(() => {
@@ -199,11 +205,42 @@ export default function CareersPage() {
 
   const companyName = site?.companyName || 'Savytech'
 
-  const itJobs = useMemo(() => (jobs || []).filter(isItJob), [jobs])
-  const nonItJobs = useMemo(() => (jobs || []).filter((j) => !isItJob(j)), [jobs])
+  const filteredJobs = useMemo(() => {
+    const keyword = String(jobKeyword || '').trim().toLowerCase()
+    const region = String(regionValue || '').trim().toLowerCase()
+    return (jobs || []).filter((j) => {
+      const title = String(j?.title || '').toLowerCase()
+      const address = String(j?.address || '').toLowerCase()
+      const salary = String(j?.salary || '').toLowerCase()
+      const description = String(j?.description || '').toLowerCase()
+      const byKeyword =
+        !keyword || [title, address, salary, description].some((field) => field.includes(keyword))
+      const byRegion = !region || address.includes(region)
+      return byKeyword && byRegion
+    })
+  }, [jobs, jobKeyword, regionValue])
+
+  const itJobs = useMemo(() => filteredJobs.filter(isItJob), [filteredJobs])
+  const nonItJobs = useMemo(() => filteredJobs.filter((j) => !isItJob(j)), [filteredJobs])
 
   const itPaged = useMemo(() => paginate(itJobs, itPage, 6), [itJobs, itPage])
   const nonItPaged = useMemo(() => paginate(nonItJobs, nonItPage, 6), [nonItJobs, nonItPage])
+
+  useEffect(() => {
+    setItPage(1)
+    setNonItPage(1)
+  }, [jobKeyword, regionValue])
+
+  function applySearchFilters(nextKeyword = jobKeyword, nextRegion = regionValue) {
+    const params = new URLSearchParams(location.search || '')
+    if (String(nextKeyword || '').trim()) params.set('keyword', String(nextKeyword || '').trim())
+    else params.delete('keyword')
+    if (String(nextRegion || '').trim()) params.set('region', String(nextRegion || '').trim())
+    else params.delete('region')
+    params.delete('jobId')
+    const q = params.toString()
+    navigate(q ? `/careers?${q}` : '/careers', { replace: true })
+  }
 
   useEffect(() => {
     function onDocClick(e) {
@@ -218,20 +255,52 @@ export default function CareersPage() {
 
   function JobCard({ job }) {
     return (
-      <Link to={`/careers/${job.id}`} className="block rounded-xl border bg-white shadow-sm transition hover:shadow-md">
-        <div className="flex items-stretch gap-4 p-5">
-          <div className="flex shrink-0 items-center">
-            <LogoMark logoUrl={site?.logoUrl} companyName={companyName} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-lg font-semibold text-[#1f6f9e]">{job.title}</div>
-            <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-              {formatApplyRange(job) ? <div>🕒 {formatApplyRange(job)}</div> : null}
-              {job.address ? <div>📍 {job.address}</div> : null}
-              <div>💼 {job.salary || 'Thỏa thuận'}</div>
+      <Link to={`/careers/${job.id}`} className="block">
+        <Card className="h-full overflow-hidden border border-border/70 bg-white transition-colors hover:border-primary/40 hover:bg-primary/[0.03]">
+          <div className="grid h-full grid-cols-1 md:grid-cols-[180px_1fr]">
+            <div className="h-full border-b bg-muted/20 md:border-b-0 md:border-r">
+              {job.imageUrl || site?.logoUrl ? (
+                <img
+                  src={job.imageUrl || site?.logoUrl}
+                  alt={job.title || companyName}
+                  className="h-full min-h-24 w-full object-cover md:min-h-40"
+                />
+              ) : (
+                <div className="grid h-full min-h-24 place-items-center md:min-h-40">
+                  <LogoMark logoUrl={site?.logoUrl} companyName={companyName} />
+                </div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <CardHeader className="p-3 pb-2 md:p-6 md:pb-2">
+                <div className="flex items-start justify-between gap-3">
+                  <CardTitle className="truncate text-sm md:text-lg">{job.title}</CardTitle>
+                  <span className="hidden shrink-0 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-medium text-primary md:inline-flex">
+                    Tuyển dụng
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-1 p-3 pt-0 text-xs text-muted-foreground md:space-y-2 md:p-6 md:pt-0 md:text-sm">
+                {formatApplyRange(job) ? (
+                  <div className="flex items-start gap-2">
+                    <CalendarDays className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/80 md:h-4 md:w-4" />
+                    <span className="leading-5">{formatApplyRange(job)}</span>
+                  </div>
+                ) : null}
+                {job.address ? (
+                  <div className="flex items-start gap-2">
+                    <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/80 md:h-4 md:w-4" />
+                    <span className="line-clamp-2 leading-5">{job.address}</span>
+                  </div>
+                ) : null}
+                <div className="flex items-start gap-2">
+                  <BriefcaseBusiness className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/80 md:h-4 md:w-4" />
+                  <span className="leading-5">{job.salary || 'Thỏa thuận'}</span>
+                </div>
+              </CardContent>
             </div>
           </div>
-        </div>
+        </Card>
       </Link>
     )
   }
@@ -310,25 +379,29 @@ export default function CareersPage() {
               ) : null}
           
          
-              <div className="mx-auto mt-8 flex max-w-3xl items-center gap-3 rounded-full bg-white/95 p-3 shadow-lg">
-                <div className="flex flex-1 items-center gap-2 px-4 text-sm text-muted-foreground">
-                  <span className="hidden sm:inline">Công việc:</span>
+              <div className="mx-auto mt-8 grid w-full max-w-5xl grid-cols-1 gap-3 rounded-2xl border border-white/20 bg-white/95 p-4 md:grid-cols-[1.5fr_1.25fr_auto]">
+                <div className="flex items-center gap-2 rounded-lg border bg-white px-3 text-sm text-muted-foreground">
+                  <span className="hidden whitespace-nowrap sm:inline">Công việc</span>
                   <input
-                    className="w-full bg-transparent text-foreground outline-none"
+                    className="h-11 w-full bg-transparent text-foreground outline-none"
                     placeholder="Tìm công việc"
                     aria-label="Tìm công việc"
+                    value={jobKeyword}
+                    onChange={(e) => setJobKeyword(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') applySearchFilters(e.currentTarget.value, regionValue)
+                    }}
                   />
                 </div>
-                <div className="h-8 w-px bg-border/70" />
-                <div className="relative flex flex-1 items-center gap-2 px-4 text-sm text-muted-foreground" data-region-dropdown>
-                  <span className="hidden sm:inline">Khu vực:</span>
+                <div className="relative flex items-center gap-2 rounded-lg border bg-white px-3 text-sm text-muted-foreground" data-region-dropdown>
+                  <span className="hidden whitespace-nowrap sm:inline">Khu vực</span>
                   <button
                     type="button"
-                    className="flex w-full items-center justify-between gap-2 bg-transparent text-left text-foreground outline-none"
+                    className="flex h-11 w-full items-center justify-between gap-2 bg-transparent text-left text-foreground outline-none"
                     onClick={() => setRegionOpen((v) => !v)}
                     aria-label="Chọn khu vực"
                   >
-                    <span className={`${regionValue ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    <span className={`whitespace-nowrap ${regionValue ? 'text-foreground' : 'text-muted-foreground'}`}>
                       {regionValue || 'Tìm theo khu vực'}
                     </span>
                     <span className="text-muted-foreground">▾</span>
@@ -347,6 +420,7 @@ export default function CareersPage() {
                           onClick={() => {
                             setRegionValue(x)
                             setRegionOpen(false)
+                            applySearchFilters(jobKeyword, x)
                           }}
                         >
                           {x}
@@ -355,8 +429,12 @@ export default function CareersPage() {
                     </div>
                   ) : null}
                 </div>
-                <Button className="h-11 w-11 rounded-full p-0" aria-label="Search">
-                  🔍
+                <Button
+                  className="h-11 rounded-lg px-5"
+                  aria-label="Search"
+                  onClick={() => applySearchFilters(jobKeyword, regionValue)}
+                >
+                  Tìm kiếm
                 </Button>
               </div>
 
@@ -410,7 +488,7 @@ export default function CareersPage() {
 
             {itJobs.length ? (
               <>
-                <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="mt-10 grid grid-cols-2 gap-3 md:gap-6">
                   {itPaged.items.map((j) => (
                     <JobCard key={j.id} job={j} />
                   ))}
@@ -434,7 +512,7 @@ export default function CareersPage() {
 
             {nonItJobs.length ? (
               <>
-                <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="mt-10 grid grid-cols-2 gap-3 md:gap-6">
                   {nonItPaged.items.map((j) => (
                     <JobCard key={j.id} job={j} />
                   ))}
