@@ -2,6 +2,7 @@ package com.example.be.content;
 
 import com.example.be.content.dto.JobPostingDto;
 import com.example.be.content.dto.SiteContentDto;
+import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -44,12 +45,12 @@ public class AdminContentController {
     }
 
     @PostMapping("/jobs")
-    public JobPostingDto createJob(@RequestBody JobPostingDto dto) {
+    public JobPostingDto createJob(@Valid @RequestBody JobPostingDto dto) {
         return contentService.createJob(dto);
     }
 
     @PutMapping("/jobs/{id}")
-    public JobPostingDto updateJob(@PathVariable long id, @RequestBody JobPostingDto dto) {
+    public JobPostingDto updateJob(@PathVariable long id, @Valid @RequestBody JobPostingDto dto) {
         return contentService.updateJob(id, dto);
     }
 

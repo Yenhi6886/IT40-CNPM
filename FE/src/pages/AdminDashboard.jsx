@@ -768,9 +768,6 @@ export default function AdminDashboard() {
           <Card>
             <CardHeader>
               <CardTitle>Nội dung trang người dùng</CardTitle>
-              <CardDescription>
-                Tất cả phần hiển thị ở trang user đều chỉnh được tại đây. Các trường ảnh có thể để trống.
-              </CardDescription>
             </CardHeader>
             <CardContent>
               {site ? (
@@ -1569,9 +1566,6 @@ export default function AdminDashboard() {
                       <Card>
                         <CardHeader>
                           <CardTitle className="text-base">KEEP INNOVATING (CTA)</CardTitle>
-                          <CardDescription>
-                            Khối này nằm sau “Văn hoá - Sự kiện”, có ảnh nền + nút “Ứng tuyển ngay”.
-                          </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3">
                           <div className="space-y-2">
@@ -1721,7 +1715,6 @@ export default function AdminDashboard() {
           <Card>
             <CardHeader>
               <CardTitle>Danh sách vị trí tuyển dụng</CardTitle>
-              <CardDescription>Chỉ job có Published = true mới hiện ở trang user.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="mb-4 grid grid-cols-1 gap-3 rounded-lg border bg-muted/10 p-3 md:grid-cols-2 xl:grid-cols-5">
@@ -1885,9 +1878,6 @@ export default function AdminDashboard() {
           <Card>
             <CardHeader>
               <CardTitle>{jobDraft.id ? 'Sửa job' : 'Tạo job mới'}</CardTitle>
-              <CardDescription>
-                Các trường ảnh có thể để trống. SortOrder nhỏ sẽ lên trước.
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1962,10 +1952,6 @@ export default function AdminDashboard() {
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <div className="text-sm font-medium">Nội dung chi tiết job</div>
-                  <div className="text-xs text-muted-foreground">
-                    Có thể chỉnh gần như Word: font, cỡ chữ, đậm/nghiêng, căn lề, màu chữ,
-                    bullet/number list, rồi hiển thị lại nguyên định dạng ở trang user.
-                  </div>
                   <RichTextEditor
                     value={jobDraft.description}
                     onChange={(html) => setJobDraft((prev) => ({ ...prev, description: html }))}
@@ -2005,9 +1991,6 @@ export default function AdminDashboard() {
           <Card>
             <CardHeader>
               <CardTitle>Quản lý CV</CardTitle>
-              <CardDescription>
-                Danh sách CV ứng tuyển, phân chia theo 3 loại: Xem xét / Phỏng vấn / Loại.
-              </CardDescription>
             </CardHeader>
             <CardContent>
               {loadingCvs ? <div className="text-sm text-muted-foreground">Đang tải…</div> : null}

@@ -135,6 +135,20 @@ function paginate(items, page, pageSize) {
   }
 }
 
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim())
+}
+
+function isValidPhone(phone) {
+  return /^[0-9+()\-\s]{8,20}$/.test(String(phone || '').trim())
+}
+
+function isValidCvFile(file) {
+  if (!file) return false
+  const name = String(file.name || '').toLowerCase()
+  return name.endsWith('.pdf') || name.endsWith('.doc') || name.endsWith('.docx')
+}
+
 export default function CareersPage() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -550,7 +564,12 @@ export default function CareersPage() {
                 onSubmit={async (e) => {
                   e.preventDefault()
                   try {
+                    if (!applyName.trim()) throw new Error('Vui lòng nhập họ và tên')
+                    if (!isValidEmail(applyEmail)) throw new Error('Email không hợp lệ')
+                    if (!isValidPhone(applyPhone)) throw new Error('Số điện thoại không hợp lệ')
                     if (!applyCvFile) throw new Error('Vui lòng chọn CV')
+                    if (!isValidCvFile(applyCvFile)) throw new Error('CV chỉ chấp nhận định dạng pdf/doc/docx')
+                    if (applyCvFile.size > 10 * 1024 * 1024) throw new Error('CV tối đa 10MB')
                     if (!applyJobId) throw new Error('Vui lòng chọn vị trí')
                     const form = new FormData()
                     form.append('jobId', String(applyJobId))

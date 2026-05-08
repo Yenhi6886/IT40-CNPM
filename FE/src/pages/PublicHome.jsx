@@ -315,7 +315,6 @@ export default function PublicHome() {
           </section>
         ) : null}
 
-        {/* Đã bỏ mục "Về chúng tôi" khỏi trang chủ theo yêu cầu */}
 
         {sections?.join !== false ? (
           <section id="join" className="border-t bg-white">

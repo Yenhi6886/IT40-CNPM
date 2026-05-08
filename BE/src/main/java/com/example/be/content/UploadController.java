@@ -19,12 +19,16 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/admin")
 public class UploadController {
+    private static final long MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
     private final Path uploadDir = Path.of("uploads");
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> upload(@RequestParam("file") MultipartFile file) throws IOException {
         if (file == null || file.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "No file"));
+        }
+        if (file.getSize() > MAX_IMAGE_SIZE_BYTES) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Image file is too large (max 5MB)"));
         }
 
         String original = StringUtils.cleanPath(file.getOriginalFilename() == null ? "" : file.getOriginalFilename());
@@ -36,6 +40,10 @@ public class UploadController {
 
         if (!isAllowedImageExt(ext)) {
             return ResponseEntity.badRequest().body(Map.of("message", "Only image files are allowed"));
+        }
+        String contentType = String.valueOf(file.getContentType() == null ? "" : file.getContentType()).toLowerCase(Locale.ROOT);
+        if (!isAllowedImageContentType(contentType)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid image content type"));
         }
 
         Files.createDirectories(uploadDir);
@@ -60,6 +68,14 @@ public class UploadController {
                 || ext.equals("jpeg")
                 || ext.equals("webp")
                 || ext.equals("gif"));
+    }
+
+    private static boolean isAllowedImageContentType(String contentType) {
+        return contentType.equals("image/png")
+            || contentType.equals("image/jpeg")
+            || contentType.equals("image/webp")
+            || contentType.equals("image/gif")
+            || contentType.equals("application/octet-stream");
     }
 }
 

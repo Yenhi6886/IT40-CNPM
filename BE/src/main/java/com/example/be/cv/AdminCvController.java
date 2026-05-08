@@ -1,11 +1,12 @@
 package com.example.be.cv;
 
 import com.example.be.cv.dto.CvApplicationDto;
+import com.example.be.cv.dto.UpdateCvStatusRequest;
+import jakarta.validation.Valid;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -53,9 +54,9 @@ public class AdminCvController {
     }
 
     @PutMapping("/{id}/status")
-    public CvApplicationDto updateStatus(@PathVariable long id, @RequestBody Map<String, String> body) {
+    public CvApplicationDto updateStatus(@PathVariable long id, @Valid @RequestBody UpdateCvStatusRequest body) {
         CvApplication app = cvRepo.findById(id).orElseThrow(() -> new IllegalArgumentException("CV not found"));
-        String next = normalizeStatus(body == null ? null : body.get("status"));
+        String next = normalizeStatus(body.status());
         app.setStatus(next);
         CvApplication saved = cvRepo.save(app);
         return toDto(saved);
@@ -79,10 +80,11 @@ public class AdminCvController {
 
     private String normalizeStatus(String raw) {
         String v = String.valueOf(raw == null ? "" : raw).trim().toUpperCase();
-        return switch (v) {
-            case "PHONG_VAN", "LOAI", "XEM_XET" -> v;
-            default -> "XEM_XET";
-        };
+        if (v.isBlank()) return "XEM_XET";
+        if (!v.equals("PHONG_VAN") && !v.equals("LOAI") && !v.equals("XEM_XET")) {
+            throw new IllegalArgumentException("Invalid CV status");
+        }
+        return v;
     }
 }
 
