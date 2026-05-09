@@ -27,6 +27,14 @@ public record JobPostingDto(
     String jobType,
     @Size(max = 200, message = "Salary must be at most 200 characters")
     String salary,
+    @Min(value = 1, message = "recruitmentHeadcount must be >= 1")
+    @Max(value = 99999, message = "recruitmentHeadcount is too large")
+    Integer recruitmentHeadcount,
+    @Pattern(
+        regexp = "^$|^(ALL|FULL_TIME|PART_TIME|INTERN|COLLABORATOR)$",
+        message = "workArrangement must be ALL, FULL_TIME, PART_TIME, INTERN, or COLLABORATOR"
+    )
+    String workArrangement,
     @Size(max = 500, message = "Image URL must be at most 500 characters")
     String imageUrl,
     @Size(max = 30000, message = "Description is too long")

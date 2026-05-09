@@ -133,6 +133,8 @@ public class ContentService {
         job.setAddress(blankToNull(dto.address()));
         job.setJobType(blankToNull(dto.jobType()));
         job.setSalary(blankToNull(dto.salary()));
+        job.setRecruitmentHeadcount(dto.recruitmentHeadcount());
+        job.setWorkArrangement(blankToNull(dto.workArrangement()));
         job.setImageUrl(blankToNull(dto.imageUrl()));
         job.setDescription(nz(dto.description(), ""));
         job.setPublished(dto.published());
@@ -213,6 +215,8 @@ public class ContentService {
             j.getAddress(),
             j.getJobType(),
             j.getSalary(),
+            j.getRecruitmentHeadcount(),
+            j.getWorkArrangement(),
             j.getImageUrl(),
             j.getDescription(),
             j.isPublished(),

@@ -372,7 +372,7 @@ export default function CareersPage() {
               : undefined
           }
         >
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-background" />
+          <div className="absolute inset-0 bg-black/25" />
           <div className="relative mx-auto flex min-h-[calc(100vh-56px)] max-w-6xl items-center px-4 py-10 md:min-h-[calc(100vh-64px)]">
             <div className="mx-auto max-w-3xl text-center text-white">
               {site?.careersHeroTitle ? (

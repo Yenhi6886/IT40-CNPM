@@ -3,6 +3,7 @@ package com.example.be.security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -37,8 +38,14 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/public/**", "/api/auth/**", "/error", "/uploads/**").permitAll()
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/admin/upload").hasAnyRole("DESIGN", "HR")
+                .requestMatchers(HttpMethod.PUT, "/api/admin/site").hasRole("DESIGN")
+                .requestMatchers(HttpMethod.GET, "/api/admin/site").hasAnyRole("DESIGN", "HR")
+                .requestMatchers("/api/admin/cv", "/api/admin/cv/**").hasRole("HR")
+                .requestMatchers("/api/admin/jobs", "/api/admin/jobs/**").hasRole("HR")
+                .requestMatchers("/api/admin/**").denyAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

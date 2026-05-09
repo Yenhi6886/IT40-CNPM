@@ -6,6 +6,28 @@ import { Button } from '@/components/ui/button'
 import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
 import Toast from '@/components/Toast'
+import { CalendarDays, CircleDollarSign, Clock, MapPin, Users } from 'lucide-react'
+
+const WORK_ARRANGEMENT_LABELS = {
+  ALL: 'Tất cả',
+  FULL_TIME: 'Toàn thời gian',
+  PART_TIME: 'Bán thời gian',
+  INTERN: 'Thực tập',
+  COLLABORATOR: 'Cộng tác viên',
+}
+
+function workArrangementLabel(code) {
+  const k = String(code || '').toUpperCase()
+  return WORK_ARRANGEMENT_LABELS[k] || '—'
+}
+
+function formatCvDeadline(iso) {
+  const s = String(iso || '').trim()
+  if (!s) return '—'
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`
+  return s.replaceAll('-', '/')
+}
 
 function renderRichHtml(value) {
   const text = String(value || '').trim()
@@ -104,6 +126,57 @@ export default function JobDetailPage() {
           <section className="bg-white">
             <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-4 py-10 lg:grid-cols-[1fr_360px]">
               <div className="rounded-2xl border bg-white p-6">
+                <div className="mb-8 overflow-hidden rounded-xl border border-border/80 bg-white">
+                  <div className="border-b border-border/70 px-5 py-4">
+                    <h2 className="text-base font-bold text-primary">Thông tin công việc</h2>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 sm:gap-4">
+                    {[
+                      {
+                        icon: Users,
+                        label: 'Số lượng tuyển',
+                        value:
+                          job.recruitmentHeadcount != null && job.recruitmentHeadcount !== ''
+                            ? String(job.recruitmentHeadcount)
+                            : '—',
+                      },
+                      {
+                        icon: CircleDollarSign,
+                        label: 'Mức lương',
+                        value: job.salary?.trim() ? job.salary : '—',
+                      },
+                      {
+                        icon: Clock,
+                        label: 'Loại hình',
+                        value: workArrangementLabel(job.workArrangement),
+                      },
+                      {
+                        icon: MapPin,
+                        label: 'Địa điểm',
+                        value: job.address?.trim() ? job.address : '—',
+                      },
+                      {
+                        icon: CalendarDays,
+                        label: 'Hạn nộp CV',
+                        value: formatCvDeadline(job.applyEndDate),
+                      },
+                    ].map((row) => {
+                      const RowIcon = row.icon
+                      return (
+                      <div
+                        key={row.label}
+                        className="flex gap-3 rounded-lg border border-border/50 bg-muted/10 px-4 py-3"
+                      >
+                        <RowIcon className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm text-muted-foreground">{row.label}</div>
+                          <div className="mt-0.5 text-sm font-semibold text-foreground">{row.value}</div>
+                        </div>
+                      </div>
+                    )})}
+                  </div>
+                </div>
+
                 {descriptionHtml ? (
                   <div className="ql-editor job-rich-content p-0" dangerouslySetInnerHTML={{ __html: descriptionHtml }} />
                 ) : (

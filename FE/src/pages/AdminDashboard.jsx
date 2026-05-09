@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLocation } from 'react-router-dom'
 import { adminApi } from '@/lib/api'
-import { getToken, setToken } from '@/lib/auth'
+import { getRole, getToken, normalizeAdminRole, setToken } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,15 @@ import RichTextEditor from '@/components/RichTextEditor'
 import { Textarea } from '@/components/ui/textarea'
 
 const PAGE_SIZE = 2
+const ADMIN_UI_STATE_KEY = 'it40_admin_ui_state'
+
+const WORK_ARRANGEMENT_OPTIONS = [
+  { value: 'ALL', label: 'Tất cả' },
+  { value: 'FULL_TIME', label: 'Toàn thời gian' },
+  { value: 'PART_TIME', label: 'Bán thời gian' },
+  { value: 'INTERN', label: 'Thực tập' },
+  { value: 'COLLABORATOR', label: 'Cộng tác viên' },
+]
 
 function clampPage(page, totalItems) {
   const totalPages = Math.max(1, Math.ceil((totalItems || 0) / PAGE_SIZE))
@@ -108,6 +117,8 @@ function defaultJob() {
     applyEndDate: '',
     address: '',
     jobType: 'IT',
+    recruitmentHeadcount: 1,
+    workArrangement: 'ALL',
     salary: '',
     imageUrl: '',
     description: '',
@@ -116,7 +127,35 @@ function defaultJob() {
   }
 }
 
+function loadAdminUiState() {
+  if (typeof window === 'undefined') {
+    return { siteCategory: 'general', homePanel: 'hero', careersPanel: 'hero', benefitsPanel: 'hero' }
+  }
+  try {
+    const raw = localStorage.getItem(ADMIN_UI_STATE_KEY)
+    if (!raw) return { siteCategory: 'general', homePanel: 'hero', careersPanel: 'hero', benefitsPanel: 'hero' }
+    const parsed = JSON.parse(raw)
+    return {
+      siteCategory: ['general', 'home', 'careers', 'benefits'].includes(parsed?.siteCategory)
+        ? parsed.siteCategory
+        : 'general',
+      homePanel: (() => {
+        const p = parsed?.homePanel
+        if (p === 'menu') return 'hero'
+        return ['hero', 'join', 'testimonials', 'culture', 'cta', 'footer'].includes(p) ? p : 'hero'
+      })(),
+      careersPanel: ['hero'].includes(parsed?.careersPanel) ? parsed.careersPanel : 'hero',
+      benefitsPanel: ['hero', 'content', 'cta'].includes(parsed?.benefitsPanel)
+        ? parsed.benefitsPanel
+        : 'hero',
+    }
+  } catch {
+    return { siteCategory: 'general', homePanel: 'hero', careersPanel: 'hero', benefitsPanel: 'hero' }
+  }
+}
+
 export default function AdminDashboard() {
+  const initialUiState = loadAdminUiState()
   const nav = useNavigate()
   const location = useLocation()
   const token = useMemo(() => getToken(), [])
@@ -130,10 +169,10 @@ export default function AdminDashboard() {
   const [notice, setNotice] = useState(null) // { type: 'success' | 'error', message: string }
   const noticeRef = useRef(null)
   const [active, setActive] = useState('site')
-  const [siteCategory, setSiteCategory] = useState('general') // general/home/careers/benefits
-  const [homePanel, setHomePanel] = useState('hero') // dropdown: hero/menu/join/testimonials/culture/cta/footer
-  const [careersPanel, setCareersPanel] = useState('hero') // dropdown: hero
-  const [benefitsPanel, setBenefitsPanel] = useState('hero') // dropdown: hero/content/cta
+  const [siteCategory, setSiteCategory] = useState(initialUiState.siteCategory) // general/home/careers/benefits
+  const [homePanel, setHomePanel] = useState(initialUiState.homePanel) // dropdown: hero/join/…/footer
+  const [careersPanel, setCareersPanel] = useState(initialUiState.careersPanel) // dropdown: hero
+  const [benefitsPanel, setBenefitsPanel] = useState(initialUiState.benefitsPanel) // dropdown: hero/content/cta
 
   const [sections, setSections] = useState({
     hero: true,
@@ -182,7 +221,6 @@ export default function AdminDashboard() {
     { title: 'Môi trường làm việc năng động', imageUrl: '', body: '' },
   ])
 
-  const [navPage, setNavPage] = useState(1)
   const [testimonialsPage, setTestimonialsPage] = useState(1)
   const [culturePage, setCulturePage] = useState(1)
   const [footerPage, setFooterPage] = useState(1)
@@ -216,6 +254,24 @@ export default function AdminDashboard() {
   }, [token, nav])
 
   useEffect(() => {
+    if (!token) return
+    const role = normalizeAdminRole(getRole())
+    const p = String(location?.pathname || '')
+    if (role === 'HR') {
+      if (p === '/admin' || p.startsWith('/admin/site')) {
+        nav('/admin/jobs', { replace: true })
+      }
+      return
+    }
+    if (
+      role === 'DESIGN' &&
+      (p.startsWith('/admin/jobs') || p.startsWith('/admin/job-edit') || p.startsWith('/admin/cv'))
+    ) {
+      nav('/admin/site', { replace: true })
+    }
+  }, [token, location.pathname, nav])
+
+  useEffect(() => {
     const p = String(location?.pathname || '')
     if (p.startsWith('/admin/jobs')) setActive('jobs')
     else if (p.startsWith('/admin/job-edit')) setActive('job-edit')
@@ -237,6 +293,12 @@ export default function AdminDashboard() {
     window.addEventListener('pointerdown', onAnyPointerDown, true)
     return () => window.removeEventListener('pointerdown', onAnyPointerDown, true)
   }, [notice])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const next = JSON.stringify({ siteCategory, homePanel, careersPanel, benefitsPanel })
+    localStorage.setItem(ADMIN_UI_STATE_KEY, next)
+  }, [siteCategory, homePanel, careersPanel, benefitsPanel])
 
   function uploadAndSet(setter) {
     return async (file) => {
@@ -261,10 +323,19 @@ export default function AdminDashboard() {
     async function load() {
       setError(null)
       try {
-        const [s, j] = await Promise.all([adminApi.site(token), adminApi.jobs(token)])
+        const role = normalizeAdminRole(getRole())
+        if (role === 'HR') {
+          const j = await adminApi.jobs(token)
+          if (cancelled) return
+          setJobs(j || [])
+          setSite(null)
+          return
+        }
+
+        const s = await adminApi.site(token)
         if (cancelled) return
         setSite(s)
-        setJobs(j || [])
+        setJobs([])
 
         const sectionObj = safeJson(s?.sectionsJson, null)
         if (sectionObj && typeof sectionObj === 'object' && !Array.isArray(sectionObj)) {
@@ -568,6 +639,12 @@ export default function AdminDashboard() {
         address: jobDraft.address || null,
         jobType: jobDraft.jobType || null,
         salary: jobDraft.salary || null,
+        recruitmentHeadcount: (() => {
+          const n = Number(jobDraft.recruitmentHeadcount)
+          if (!Number.isFinite(n) || n < 1) return null
+          return Math.floor(n)
+        })(),
+        workArrangement: jobDraft.workArrangement || null,
       }
       if (dto.id) {
         const updated = await adminApi.updateJob(token, dto.id, dto)
@@ -628,6 +705,8 @@ export default function AdminDashboard() {
         address: job.address || null,
         jobType: job.jobType || null,
         salary: job.salary || null,
+        recruitmentHeadcount: job.recruitmentHeadcount ?? null,
+        workArrangement: job.workArrangement || null,
         imageUrl: job.imageUrl || null,
         description: job.description || '',
         published: !job.published,
@@ -651,19 +730,26 @@ export default function AdminDashboard() {
     nav('/admin/login', { replace: true })
   }
 
-  const adminNavItems = [
-    { id: 'site', label: 'Nội dung trang', path: '/admin/site' },
-    { id: 'jobs', label: 'Tuyển dụng', path: '/admin/jobs' },
-    { id: 'job-edit', label: 'Thêm/Sửa job', path: '/admin/job-edit' },
-    { id: 'cv', label: 'Quản lý CV', path: '/admin/cv' },
-  ]
+  const adminNavItems = useMemo(() => {
+    const role = normalizeAdminRole(getRole())
+    if (role === 'HR') {
+      return [
+        { id: 'jobs', label: 'Tuyển dụng', path: '/admin/jobs' },
+        { id: 'job-edit', label: 'Thêm/Sửa job', path: '/admin/job-edit' },
+        { id: 'cv', label: 'Quản lý CV', path: '/admin/cv' },
+      ]
+    }
+    return [{ id: 'site', label: 'Nội dung trang (Design)', path: '/admin/site' }]
+  }, [token, location.pathname])
 
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
           <div>
-            <div className="text-sm text-muted-foreground">Admin</div>
+            <div className="text-sm text-muted-foreground">
+              {normalizeAdminRole(getRole()) === 'HR' ? 'Tuyển dụng (HR)' : 'Design / nội dung'}
+            </div>
             <div className="text-xl font-semibold tracking-tight">{site?.companyName || 'Savytech'}</div>
           </div>
           <div className="flex items-center gap-2">
@@ -798,7 +884,6 @@ export default function AdminDashboard() {
                         <div className="mt-2 space-y-1">
                           {[
                             { id: 'hero', label: 'Hero' },
-                            { id: 'menu', label: 'Menu header' },
                             { id: 'join', label: 'Trở thành Savytech' },
                             { id: 'testimonials', label: 'Người Savytech nói gì' },
                             { id: 'culture', label: 'Văn hoá - Sự kiện' },
@@ -1143,89 +1228,6 @@ export default function AdminDashboard() {
                               />
                             ) : null}
                           </div>
-                        </CardContent>
-                      </Card>
-                    ) : null}
-
-                    {siteCategory === 'home' && homePanel === 'menu' ? (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-base">Menu header</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          {navItems
-                            .slice(
-                              (clampPage(navPage, navItems.length) - 1) * PAGE_SIZE,
-                              clampPage(navPage, navItems.length) * PAGE_SIZE,
-                            )
-                            .map((it, localIdx) => {
-                              const idx = (clampPage(navPage, navItems.length) - 1) * PAGE_SIZE + localIdx
-                              return (
-                            <div
-                              key={idx}
-                              className="grid grid-cols-1 gap-3 rounded-lg border p-4 md:grid-cols-[1fr_1fr_auto]"
-                            >
-                              <div className="space-y-1">
-                                <div className="text-xs font-medium text-muted-foreground">Label</div>
-                                <Input
-                                  value={it.label}
-                                  onChange={(e) =>
-                                    setNavItems((prev) =>
-                                      prev.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)),
-                                    )
-                                  }
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <div className="text-xs font-medium text-muted-foreground">Href</div>
-                                <Input
-                                  value={it.href}
-                                  onChange={(e) =>
-                                    setNavItems((prev) =>
-                                      prev.map((x, i) => (i === idx ? { ...x, href: e.target.value } : x)),
-                                    )
-                                  }
-                                  placeholder="#home"
-                                />
-                              </div>
-                              <div className="flex items-end">
-                                <Button
-                                  variant="destructive"
-                                  type="button"
-                                  onClick={() =>
-                                    setNavItems((prev) => {
-                                      if (!confirmDelete('Bạn chắc chắn muốn xóa menu này?')) return prev
-                                      const next = prev.filter((_, i) => i !== idx)
-                                      setNavPage((p) => clampPage(p, next.length))
-                                      return next
-                                    })
-                                  }
-                                  disabled={navItems.length <= 1}
-                                >
-                                  Xóa
-                                </Button>
-                              </div>
-                            </div>
-                              )
-                            })}
-                          <Button
-                            variant="outline"
-                            type="button"
-                            onClick={() =>
-                              setNavItems((prev) => {
-                                const next = [...prev, { label: '', href: '' }]
-                                setNavPage(clampPage(999, next.length))
-                                return next
-                              })
-                            }
-                          >
-                            + Thêm menu
-                          </Button>
-                          <PaginationBar
-                            page={clampPage(navPage, navItems.length)}
-                            totalItems={navItems.length}
-                            onChange={(p) => setNavPage(clampPage(p, navItems.length))}
-                          />
                         </CardContent>
                       </Card>
                     ) : null}
@@ -1817,6 +1819,9 @@ export default function AdminDashboard() {
                               applyEndDate: j.applyEndDate || '',
                               address: j.address || '',
                               jobType: j.jobType || 'IT',
+                              recruitmentHeadcount:
+                                j.recruitmentHeadcount != null ? j.recruitmentHeadcount : 1,
+                              workArrangement: j.workArrangement || 'ALL',
                               salary: j.salary || '',
                               description: j.description || '',
                             })
@@ -1885,48 +1890,89 @@ export default function AdminDashboard() {
                     placeholder="Java Developer"
                   />
                 </div>
-                <div className="space-y-2">
-                  <div className="text-sm font-medium">Thời gian ứng tuyển (từ ngày)</div>
-                  <Input
-                    type="date"
-                    value={jobDraft.applyStartDate}
-                    onChange={(e) => setJobDraft({ ...jobDraft, applyStartDate: e.target.value })}
-                  />
+
+                <div className="space-y-3 md:col-span-2 rounded-xl border border-border/80 bg-muted/15 p-4">
+                  <div className="text-sm font-semibold text-primary">Vị trí</div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Phân loại vị trí</div>
+                      <select
+                        className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        value={jobDraft.jobType || 'IT'}
+                        onChange={(e) => setJobDraft({ ...jobDraft, jobType: e.target.value })}
+                      >
+                        <option value="IT">IT</option>
+                        <option value="NON_IT">Non-IT</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <div className="text-sm font-medium">Thời gian ứng tuyển (đến ngày)</div>
-                  <Input
-                    type="date"
-                    value={jobDraft.applyEndDate}
-                    onChange={(e) => setJobDraft({ ...jobDraft, applyEndDate: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm font-medium">Địa chỉ cụ thể</div>
-                  <Input
-                    value={jobDraft.address}
-                    onChange={(e) => setJobDraft({ ...jobDraft, address: e.target.value })}
-                    placeholder="Tầng 10, Tòa nhà ABC, 123 Đường XYZ, Hà Nội"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm font-medium">Loại job</div>
-                  <select
-                    className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    value={jobDraft.jobType || 'IT'}
-                    onChange={(e) => setJobDraft({ ...jobDraft, jobType: e.target.value })}
-                  >
-                    <option value="IT">IT</option>
-                    <option value="NON_IT">NON-IT</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm font-medium">Lương</div>
-                  <Input
-                    value={jobDraft.salary}
-                    onChange={(e) => setJobDraft({ ...jobDraft, salary: e.target.value })}
-                    placeholder="Thỏa thuận"
-                  />
+
+                <div className="space-y-3 md:col-span-2 rounded-xl border border-border/80 bg-muted/15 p-4">
+                  <div className="text-sm font-semibold text-primary">Thông tin tuyển dụng</div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Số lượng tuyển</div>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={String(jobDraft.recruitmentHeadcount ?? '')}
+                        onChange={(e) =>
+                          setJobDraft({
+                            ...jobDraft,
+                            recruitmentHeadcount: e.target.value === '' ? '' : Number(e.target.value),
+                          })
+                        }
+                        placeholder="1"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Loại hình</div>
+                      <select
+                        className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        value={jobDraft.workArrangement || 'ALL'}
+                        onChange={(e) => setJobDraft({ ...jobDraft, workArrangement: e.target.value })}
+                      >
+                        {WORK_ARRANGEMENT_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Thời gian ứng tuyển (từ ngày)</div>
+                      <Input
+                        type="date"
+                        value={jobDraft.applyStartDate}
+                        onChange={(e) => setJobDraft({ ...jobDraft, applyStartDate: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Thời gian ứng tuyển (đến ngày)</div>
+                      <Input
+                        type="date"
+                        value={jobDraft.applyEndDate}
+                        onChange={(e) => setJobDraft({ ...jobDraft, applyEndDate: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <div className="text-sm font-medium">Địa chỉ / địa điểm làm việc</div>
+                      <Input
+                        value={jobDraft.address}
+                        onChange={(e) => setJobDraft({ ...jobDraft, address: e.target.value })}
+                        placeholder="VD: Hồ Chí Minh hoặc địa chỉ đầy đủ"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <div className="text-sm font-medium">Mức lương</div>
+                      <Input
+                        value={jobDraft.salary}
+                        onChange={(e) => setJobDraft({ ...jobDraft, salary: e.target.value })}
+                        placeholder="VD: 20 - 25 triệu ₫ / Thỏa thuận"
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <div className="text-sm font-medium">SortOrder</div>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { authApi } from '@/lib/api'
-import { setToken } from '@/lib/auth'
+import { setRole, setToken } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,7 @@ export default function AdminLogin() {
     try {
       const res = await authApi.login(username, password)
       setToken(res.token)
+      setRole(res.role || '')
       nav('/admin', { replace: true })
     } catch (err) {
       setError(err?.message || 'Login failed')
@@ -33,9 +34,9 @@ export default function AdminLogin() {
       <div className="mx-auto flex max-w-md flex-col px-4 py-14">
         <Card>
           <CardHeader>
-            <CardTitle>Đăng nhập Admin</CardTitle>
+            <CardTitle>Đăng nhập quản trị</CardTitle>
             <CardDescription>
-              Dùng tài khoản bootstrap từ BE (mặc định: <b>admin</b> / <b>admin123</b>).
+              Design: <b>admin</b> / <b>admin123</b> — Tuyển dụng (HR): <b>hr</b> / <b>hr123</b> (cấu hình trên BE).
             </CardDescription>
           </CardHeader>
           <CardContent>

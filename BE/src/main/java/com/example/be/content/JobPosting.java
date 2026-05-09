@@ -43,6 +43,17 @@ public class JobPosting {
     @Column(length = 200)
     private String salary;
 
+    /** Số lượng cần tuyển (nullable = chưa khai báo). */
+    @Column
+    private Integer recruitmentHeadcount;
+
+    /**
+     * Loại hình: ALL, FULL_TIME, PART_TIME, INTERN, COLLABORATOR
+     * (đồng bộ với workArrangement trong API).
+     */
+    @Column(length = 32)
+    private String workArrangement;
+
     @Column(length = 500)
     private String imageUrl;
 

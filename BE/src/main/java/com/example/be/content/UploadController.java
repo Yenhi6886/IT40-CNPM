@@ -19,7 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/admin")
 public class UploadController {
-    private static final long MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+    private static final long MAX_IMAGE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
     private final Path uploadDir = Path.of("uploads");
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -28,7 +28,7 @@ public class UploadController {
             return ResponseEntity.badRequest().body(Map.of("message", "No file"));
         }
         if (file.getSize() > MAX_IMAGE_SIZE_BYTES) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Image file is too large (max 5MB)"));
+            return ResponseEntity.badRequest().body(Map.of("message", "Image file is too large (max 50MB)"));
         }
 
         String original = StringUtils.cleanPath(file.getOriginalFilename() == null ? "" : file.getOriginalFilename());
@@ -73,6 +73,7 @@ public class UploadController {
     private static boolean isAllowedImageContentType(String contentType) {
         return contentType.equals("image/png")
             || contentType.equals("image/jpeg")
+            || contentType.equals("image/jpg")
             || contentType.equals("image/webp")
             || contentType.equals("image/gif")
             || contentType.equals("application/octet-stream");

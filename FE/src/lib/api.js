@@ -1,7 +1,21 @@
+function apiBase() {
+  if (!import.meta.env.DEV) return ''
+  const raw = import.meta.env.VITE_DEV_API_ORIGIN
+  if (raw === '') return ''
+  const base = (raw == null ? 'http://127.0.0.1:8080' : String(raw)).replace(/\/$/, '')
+  return base
+}
+
+function apiUrl(path) {
+  const base = apiBase()
+  if (!base) return path
+  return `${base}${path.startsWith('/') ? path : `/${path}`}`
+}
+
 async function request(path, { method = 'GET', body, token } = {}) {
   const headers = { 'Content-Type': 'application/json' }
   if (token) headers.Authorization = `Bearer ${token}`
-  const res = await fetch(path, {
+  const res = await fetch(apiUrl(path), {
     method,
     headers,
     body: body == null ? undefined : JSON.stringify(body),
@@ -24,7 +38,7 @@ async function upload(path, { token, file } = {}) {
   if (token) headers.Authorization = `Bearer ${token}`
   const form = new FormData()
   form.append('file', file)
-  const res = await fetch(path, { method: 'POST', headers, body: form })
+  const res = await fetch(apiUrl(path), { method: 'POST', headers, body: form })
   const isJson = (res.headers.get('content-type') || '').includes('application/json')
   const payload = isJson ? await res.json().catch(() => null) : await res.text()
   if (!res.ok) {
@@ -40,7 +54,7 @@ async function upload(path, { token, file } = {}) {
 async function uploadForm(path, { token, form } = {}) {
   const headers = {}
   if (token) headers.Authorization = `Bearer ${token}`
-  const res = await fetch(path, { method: 'POST', headers, body: form })
+  const res = await fetch(apiUrl(path), { method: 'POST', headers, body: form })
   const isJson = (res.headers.get('content-type') || '').includes('application/json')
   const payload = isJson ? await res.json().catch(() => null) : await res.text()
   if (!res.ok) {
@@ -56,7 +70,7 @@ async function uploadForm(path, { token, form } = {}) {
 async function downloadBlob(path, { token } = {}) {
   const headers = {}
   if (token) headers.Authorization = `Bearer ${token}`
-  const res = await fetch(path, { method: 'GET', headers })
+  const res = await fetch(apiUrl(path), { method: 'GET', headers })
   if (!res.ok) {
     const isJson = (res.headers.get('content-type') || '').includes('application/json')
     const payload = isJson ? await res.json().catch(() => null) : await res.text()
@@ -99,7 +113,7 @@ export const adminApi = {
   cv: (token, id) => request(`/api/admin/cv/${id}`, { token }),
   updateCvStatus: (token, id, status) =>
     request(`/api/admin/cv/${id}/status`, { method: 'PUT', token, body: { status } }),
-  cvDownloadUrl: (id) => `/api/admin/cv/${id}/download`,
+  cvDownloadUrl: (id) => apiUrl(`/api/admin/cv/${id}/download`),
   downloadCv: (token, id) => downloadBlob(`/api/admin/cv/${id}/download`, { token }),
 }
 

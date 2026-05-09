@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Link, useNavigate } from 'react-router-dom'
 import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
-import { BriefcaseBusiness, CalendarDays, ChevronLeft, ChevronRight, MapPin } from 'lucide-react'
+import { BriefcaseBusiness, CalendarDays, ChevronLeft, ChevronRight, Mail, MapPin } from 'lucide-react'
 
 function safeJsonArray(text) {
   try {
@@ -358,7 +358,7 @@ export default function PublicHome() {
                 </div>
                 <div className="flex gap-2">
                   <Button asChild>
-                    <a href="/careers">Xem thêm</a>
+                    <a href="/careers#jobs">Xem thêm</a>
                   </Button>
                 </div>
               </div>
@@ -616,35 +616,31 @@ export default function PublicHome() {
         ) : null}
 
         <section className="border-t bg-[#0b2d3a]">
-          <div
-            className="relative overflow-hidden"
-            style={
-              (site?.ctaBackgroundUrl || site?.heroBackgroundUrl)
-                ? {
-                    backgroundImage: `url(${site.ctaBackgroundUrl || site.heroBackgroundUrl})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                  }
-                : undefined
-            }
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/75 via-slate-900/55 to-slate-950/60" />
-            <div className="relative mx-auto max-w-6xl px-4 py-14 md:py-16">
-              <div className="rounded-2xl border border-white/20 bg-white/10 p-7 text-white backdrop-blur-sm md:p-10">
-                <div className="max-w-3xl">
-                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/80">
-                    Career At Savytech
-                  </div>
-                  <h3 className="mt-2 text-3xl font-bold tracking-tight md:text-5xl">KEEP INNOVATING</h3>
-                  <p className="mt-3 text-sm leading-6 text-white/85 md:text-base">
-                    Đồng hành cùng đội ngũ giàu kinh nghiệm, phát triển sự nghiệp bền vững và tạo ra giá trị thực tế
-                    mỗi ngày.
-                  </p>
-                  <div className="mt-6">
-                    <Button asChild size="lg" className="h-11 rounded-md px-6">
-                      <a href="/careers#apply">Ứng tuyển ngay</a>
-                    </Button>
-                  </div>
+          <div className="relative min-h-[320px] overflow-hidden md:min-h-[420px]">
+            {(site?.ctaBackgroundUrl || site?.heroBackgroundUrl) ? (
+              <div
+                className="pointer-events-none absolute inset-y-0 left-1/2 w-[125vw] min-w-[100%] -translate-x-1/2 bg-cover bg-center bg-no-repeat"
+                style={{
+                  backgroundImage: `url(${site.ctaBackgroundUrl || site.heroBackgroundUrl})`,
+                }}
+              />
+            ) : null}
+            <div className="absolute inset-0 bg-black/55" />
+            <div className="relative mx-auto flex min-h-[320px] w-full max-w-none flex-col items-center justify-center px-4 py-24 text-center text-white md:min-h-[420px] md:py-28">
+              <div className="w-full">
+                <h3 className="text-5xl font-extrabold uppercase tracking-[0.03em] md:text-6xl">
+                  KEEP INNOVATING
+                </h3>
+                <div className="mt-8 flex justify-center">
+                  <Button
+                    asChild
+                    className="h-20 min-w-[300px] rounded-full border-2 border-white/35 bg-[#32a6e8] px-11 text-[26px] font-semibold leading-none text-white shadow-[0_12px_30px_rgba(50,166,232,0.35)] hover:bg-[#2d9cdd] [&_svg]:!size-9 [&_svg]:shrink-0"
+                  >
+                    <a href="/careers#apply" className="inline-flex items-center justify-center gap-4">
+                      <Mail aria-hidden strokeWidth={2.25} />
+                      <span className="leading-none">Ứng tuyển ngay</span>
+                    </a>
+                  </Button>
                 </div>
               </div>
             </div>

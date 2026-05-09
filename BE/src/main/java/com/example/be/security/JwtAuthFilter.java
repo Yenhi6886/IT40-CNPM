@@ -30,17 +30,28 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring("Bearer ".length()).trim();
             jwtService.parse(token).ifPresent(principal -> {
-                Role role = principal.role();
+                String authority = authorityFor(principal.role());
                 var auth = new UsernamePasswordAuthenticationToken(
                     principal.username(),
                     null,
-                    java.util.List.of(new SimpleGrantedAuthority("ROLE_" + role.name()))
+                    java.util.List.of(new SimpleGrantedAuthority(authority))
                 );
                 SecurityContextHolder.getContext().setAuthentication(auth);
             });
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /** ADMIN (legacy) được coi như DESIGN để khớp phân quyền mới. */
+    private static String authorityFor(Role role) {
+        if (role == Role.ADMIN || role == Role.DESIGN) {
+            return "ROLE_DESIGN";
+        }
+        if (role == Role.HR) {
+            return "ROLE_HR";
+        }
+        return "ROLE_" + role.name();
     }
 }
 

@@ -76,7 +76,7 @@ export default function SiteHeader({ site }) {
         <div className="flex items-center gap-2">
           <Link
             to="/careers#apply"
-            className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm text-primary-foreground hover:bg-primary/90"
+            className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-[#32a6e8] px-5 py-2.5 text-[14px] font-medium leading-none text-white shadow-[0_2px_10px_rgba(50,166,232,0.28)] transition-colors hover:bg-[#2d9cdd] md:px-7 md:py-3 md:text-[15px]"
           >
             Ứng tuyển ngay
           </Link>

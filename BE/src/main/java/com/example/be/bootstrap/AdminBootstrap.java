@@ -22,18 +22,26 @@ public class AdminBootstrap implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        String username = env.getProperty("app.bootstrap.admin.username", "admin");
-        String password = env.getProperty("app.bootstrap.admin.password", "admin123");
+        String designUser = env.getProperty("app.bootstrap.admin.username", "admin");
+        String designPass = env.getProperty("app.bootstrap.admin.password", "admin123");
+        String hrUser = env.getProperty("app.bootstrap.hr.username", "hr");
+        String hrPass = env.getProperty("app.bootstrap.hr.password", "hr123");
 
-        if (repo.existsByUsername(username)) {
-            return;
+        if (!repo.existsByUsername(designUser)) {
+            UserAccount design = new UserAccount();
+            design.setUsername(designUser);
+            design.setPasswordHash(passwordEncoder.encode(designPass));
+            design.setRole(Role.DESIGN);
+            repo.save(design);
         }
 
-        UserAccount admin = new UserAccount();
-        admin.setUsername(username);
-        admin.setPasswordHash(passwordEncoder.encode(password));
-        admin.setRole(Role.ADMIN);
-        repo.save(admin);
+        if (!hrUser.isBlank() && !repo.existsByUsername(hrUser)) {
+            UserAccount hr = new UserAccount();
+            hr.setUsername(hrUser);
+            hr.setPasswordHash(passwordEncoder.encode(hrPass));
+            hr.setRole(Role.HR);
+            repo.save(hr);
+        }
     }
 }
 

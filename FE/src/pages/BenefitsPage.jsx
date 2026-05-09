@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
 import { useNavigate } from 'react-router-dom'
+import { Mail } from 'lucide-react'
 
 function safeJsonArray(text) {
   try {
@@ -35,6 +36,7 @@ export default function BenefitsPage() {
   const [regionOpen, setRegionOpen] = useState(false)
   const [regionValue, setRegionValue] = useState('')
   const [jobKeyword, setJobKeyword] = useState('')
+  const [heroReady, setHeroReady] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -64,6 +66,31 @@ export default function BenefitsPage() {
     return () => document.removeEventListener('click', onDocClick)
   }, [])
 
+  const heroBackgroundUrl = String(site?.benefitsHeroBackgroundUrl || '').trim()
+
+  useEffect(() => {
+    if (!heroBackgroundUrl) {
+      setHeroReady(false)
+      return
+    }
+
+    let cancelled = false
+    setHeroReady(false)
+    const img = new Image()
+    img.src = heroBackgroundUrl
+    img.decoding = 'async'
+    img.onload = () => {
+      if (!cancelled) setHeroReady(true)
+    }
+    img.onerror = () => {
+      if (!cancelled) setHeroReady(true)
+    }
+
+    return () => {
+      cancelled = true
+    }
+  }, [heroBackgroundUrl])
+
   const cards = useMemo(() => safeJsonArray(site?.benefitsPageJson), [site?.benefitsPageJson])
 
   function goToCareersWithFilters() {
@@ -79,19 +106,20 @@ export default function BenefitsPage() {
       <SiteHeader site={site} />
 
       <main>
-        <section
-          className="relative"
-          style={
-            site?.benefitsHeroBackgroundUrl
-              ? {
-                  backgroundImage: `url(${site.benefitsHeroBackgroundUrl})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                }
-              : undefined
-          }
-        >
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-background" />
+        <section className="relative overflow-hidden bg-slate-700">
+          {heroBackgroundUrl ? (
+            <img
+              src={heroBackgroundUrl}
+              alt=""
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+                heroReady ? 'opacity-100' : 'opacity-0'
+              }`}
+            />
+          ) : null}
+          <div className="absolute inset-0 bg-black/25" />
           <div className="relative mx-auto flex min-h-[calc(100vh-56px)] max-w-6xl items-center px-4 py-10 md:min-h-[calc(100vh-64px)]">
             <div className="mx-auto max-w-3xl text-center text-white">
               {site?.benefitsHeroTitle ? (
@@ -216,24 +244,33 @@ export default function BenefitsPage() {
         </section>
 
         <section className="border-t bg-[#0b2d3a]">
-          <div
-            className="relative overflow-hidden"
-            style={
-              site?.benefitsCtaBackgroundUrl
-                ? {
-                    backgroundImage: `url(${site?.benefitsCtaBackgroundUrl})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                  }
-                : undefined
-            }
-          >
-            <div className="absolute inset-0 bg-black/45" />
-            <div className="relative mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-14 text-center text-white">
-              <div className="text-3xl font-extrabold tracking-tight md:text-5xl">KEEP INNOVATING</div>
-              <Button asChild className="bg-primary">
-                <a href="/careers#apply">Ứng tuyển ngay</a>
-              </Button>
+          <div className="relative min-h-[320px] overflow-hidden md:min-h-[420px]">
+            {site?.benefitsCtaBackgroundUrl ? (
+              <div
+                className="pointer-events-none absolute inset-y-0 left-1/2 w-[125vw] min-w-[100%] -translate-x-1/2 bg-cover bg-center bg-no-repeat"
+                style={{
+                  backgroundImage: `url(${site.benefitsCtaBackgroundUrl})`,
+                }}
+              />
+            ) : null}
+            <div className="absolute inset-0 bg-black/55" />
+            <div className="relative mx-auto flex min-h-[320px] w-full max-w-none flex-col items-center justify-center px-4 py-24 text-center text-white md:min-h-[420px] md:py-28">
+              <div className="w-full">
+                <h3 className="text-5xl font-extrabold uppercase tracking-[0.03em] md:text-6xl">
+                  KEEP INNOVATING
+                </h3>
+                <div className="mt-8 flex justify-center">
+                  <Button
+                    asChild
+                    className="h-20 min-w-[300px] rounded-full border-2 border-white/35 bg-[#32a6e8] px-11 text-[26px] font-semibold leading-none text-white shadow-[0_12px_30px_rgba(50,166,232,0.35)] hover:bg-[#2d9cdd] [&_svg]:!size-9 [&_svg]:shrink-0"
+                  >
+                    <a href="/careers#apply" className="inline-flex items-center justify-center gap-4">
+                      <Mail aria-hidden strokeWidth={2.25} />
+                      <span className="leading-none">Ứng tuyển ngay</span>
+                    </a>
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </section>

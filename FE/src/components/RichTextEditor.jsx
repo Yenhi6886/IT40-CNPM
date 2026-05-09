@@ -60,7 +60,6 @@ export default function RichTextEditor({ value, onChange, placeholder, className
         'background',
         'align',
         'list',
-        'bullet',
         'indent',
       ],
     })
