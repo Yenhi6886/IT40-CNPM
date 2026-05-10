@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { ChevronUp } from 'lucide-react'
 
-const NAVY = '#002060'
-const MUTED = '#666666'
-const BORDER = '#e0e0e0'
+const FOOTER_BG = '#3c4148'
+const FOOTER_TEXT = '#c8cbd0'
+const FOOTER_HEADING = '#ffffff'
+const FOOTER_LABEL = 'rgba(255,255,255,0.55)'
 
 function safeJsonObject(text, fallback) {
   try {
@@ -15,212 +15,204 @@ function safeJsonObject(text, fallback) {
   }
 }
 
-function defaultLinkColumns(companyName) {
-  const brand = companyName || 'Công ty'
-  return [
-    {
-      title: 'Về chúng tôi',
-      links: [
-        { label: 'Giới thiệu công ty', href: '/' },
-        { label: 'Tham quan văn phòng', href: '/' },
-        { label: 'Thông tin liên hệ', href: '/' },
-        { label: 'Câu hỏi thường gặp', href: '/' },
-      ],
-    },
-    {
-      title: `Life at ${brand}`,
-      links: [
-        { label: 'Hoạt động', href: '/' },
-        { label: 'Văn hoá đặc sắc', href: '/#culture' },
-        { label: 'Phát triển sự nghiệp', href: '/careers' },
-        { label: 'Phúc lợi', href: '/benefits' },
-      ],
-    },
-    {
-      title: 'Tin tức & Sự kiện',
-      links: [
-        { label: 'Tin tức', href: '/' },
-        { label: 'Sự kiện', href: '/' },
-      ],
-    },
-  ]
+const HN_ADDRESS =
+  'Hà Nội Tầng 3, tòa CT1, tòa nhà Bắc Hà C14, phố Tố Hữu, phường Đại Mỗ, thành phố Hà Nội, Việt Nam'
+
+/** Ba văn phòng. Trụ sở = địa chỉ Hà Nội + Tel + Email; hai VP còn lại chỉ địa chỉ. */
+const DEFAULT_OFFICES = [
+  {
+    title: 'Trụ sở chính',
+    address: HN_ADDRESS,
+    tel: '0793313076',
+    hotline: '',
+    email: 'hrsavytech@gmail.com',
+  },
+  {
+    title: 'Văn phòng Hà Nội',
+    address: HN_ADDRESS,
+    tel: '',
+    hotline: '',
+    email: '',
+  },
+  {
+    title: 'Văn phòng Đà Nẵng',
+    address:
+      'Tầng 10, Tòa nhà SHB Đà Nẵng, số 06 Nguyễn Văn Linh, phường Hải Châu, thành phố Đà Nẵng, Việt Nam',
+    tel: '',
+    hotline: '',
+    email: '',
+  },
+]
+
+function officeTitleFold(rawTitle) {
+  return String(rawTitle || '')
+    .trim()
+    .replace(/đ/gi, 'd')
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
-function normalizeLinkColumns(raw, companyName) {
-  if (!Array.isArray(raw) || !raw.length) return defaultLinkColumns(companyName)
-  return raw.map((col) => ({
-    title: String(col?.title || '').trim() || '—',
-    links: Array.isArray(col?.links)
-      ? col.links
-          .map((l) => ({
-            label: String(l?.label || '').trim(),
-            href: String(l?.href || '').trim(),
-          }))
-          .filter((l) => l.label)
-      : [],
-  }))
-}
-
-/** Lucide không còn export icon thương hiệu — dùng SVG tối giản. */
-function IconFacebook({ className }) {
+/** CMS cũ: NHẬT BẢN, SINGAPORE, Peru; hoặc «Thu hút NL» để HN/ĐN sai cột 0–1. */
+function isLegacyRemovedOfficeTitle(rawTitle) {
+  const t = String(rawTitle || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
+  if (t === 'NHẬT BẢN' || t === 'SINGAPORE') return true
+  const f = officeTitleFold(rawTitle)
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-    </svg>
+    f === 'NHAT BAN' ||
+    f === 'SINGAPORE' ||
+    f === 'VAN PHONG PERU' ||
+    f === 'PERU'
   )
 }
 
-function IconYoutube({ className }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-    </svg>
-  )
+/** Bỏ merge CMS nếu tiêu đề không khớp vị trí (dữ liệu footerJson cũ). */
+function shouldUseDefaultOfficeOnly(defIndex, cmsTitle) {
+  if (isLegacyRemovedOfficeTitle(cmsTitle)) return true
+  const f = officeTitleFold(cmsTitle)
+  if (defIndex === 0 && (f === 'HA NOI' || f === 'HANOI')) return true
+  if (defIndex === 1 && (f === 'DA NANG' || f === 'DANANG')) return true
+  return false
 }
 
-function IconInstagram({ className }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
-      <circle cx="12" cy="12" r="4" />
-      <circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none" />
-    </svg>
-  )
+function normalizeOffices(raw) {
+  return DEFAULT_OFFICES.map((def, i) => {
+    const o = Array.isArray(raw) ? raw[i] : null
+    if (!o || typeof o !== 'object') return applyOfficeContactRules(def, i)
+    if (shouldUseDefaultOfficeOnly(i, o.title)) return applyOfficeContactRules(def, i)
+    const merged = {
+      title: String(o.title || def.title).trim(),
+      address: String(o.address || def.address).trim(),
+      tel: String(o.tel ?? o.phone ?? def.tel ?? '').trim(),
+      hotline: String(o.hotline || def.hotline).trim(),
+      email: String(o.email ?? def.email ?? '').trim(),
+    }
+    return applyOfficeContactRules(merged, i)
+  })
 }
 
-function FooterNavLink({ href, children }) {
-  const cls =
-    'text-sm leading-relaxed text-[#666666] transition-colors hover:text-[#002060] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002060]/25 rounded-sm'
-  const h = String(href || '').trim()
-  if (!h || h === '#') {
-    return <span className={`${cls} cursor-default`}>{children}</span>
+/** Chỉ trụ sở (0) hiển thị Tel / Email; hai VP kia không hiển thị liên hệ. */
+function applyOfficeContactRules(block, index) {
+  if (index === 0) {
+    return {
+      ...block,
+      tel: String(block.tel || '').trim(),
+      hotline: '',
+      email: String(block.email || '').trim(),
+    }
   }
-  if (/^https?:\/\//i.test(h)) {
-    return (
-      <a href={h} className={cls} target="_blank" rel="noopener noreferrer">
-        {children}
-      </a>
-    )
+  return {
+    ...block,
+    tel: '',
+    hotline: '',
+    email: '',
   }
-  return (
-    <Link to={h} className={cls}>
-      {children}
-    </Link>
-  )
 }
 
-function SocialCircle({ type, href }) {
-  const h = String(href || '').trim()
-  const wrap =
-    'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#002060]/40'
-  const inner = (() => {
-    if (type === 'facebook')
-      return (
-        <span className={`${wrap} bg-[#1877f2]`} title="Facebook">
-          <IconFacebook className="h-[18px] w-[18px] text-white" />
-        </span>
-      )
-    if (type === 'youtube')
-      return (
-        <span className={`${wrap} bg-[#ff0000]`} title="YouTube">
-          <IconYoutube className="h-[18px] w-[18px] text-white" />
-        </span>
-      )
-    if (type === 'instagram')
-      return (
-        <span
-          className={`${wrap} bg-gradient-to-br from-[#f09433] via-[#dc2743] to-[#bc1888]`}
-          title="Instagram"
-        >
-          <IconInstagram className="h-[18px] w-[18px] text-white" />
-        </span>
-      )
-    if (type === 'zalo')
-      return (
-        <span className={`${wrap} bg-[#0068ff]`} title="Zalo">
-          <span className="text-[10px] font-bold leading-none tracking-tight">Zalo</span>
-        </span>
-      )
-    return null
-  })()
+function telHref(tel) {
+  const digits = String(tel || '').replace(/[^\d+]/g, '')
+  if (!digits) return null
+  return digits.startsWith('+') ? digits : `tel:${digits}`
+}
 
-  if (!inner) return null
-
-  if (!h || h === '#') {
-    return (
-      <span className="pointer-events-none opacity-40" aria-hidden>
-        {inner}
-      </span>
-    )
-  }
+function OfficeBlock({ title, address, tel, hotline, email }) {
+  const telLink = tel ? telHref(tel) : null
+  const hotFirst = String(hotline || '')
+    .split(/\s*-\s*/)[0]
+    ?.replace(/[^\d+]/g, '')
+  const hotLink = hotFirst && hotFirst.length >= 8 ? `tel:${hotFirst}` : null
+  const em = String(email || '').trim()
 
   return (
-    <a href={h} className="inline-flex" target="_blank" rel="noopener noreferrer" aria-label={type}>
-      {inner}
-    </a>
+    <div>
+      <h3 className="text-[15px] font-bold leading-snug" style={{ color: FOOTER_HEADING }}>
+        {title}
+      </h3>
+      <div className="mt-4 space-y-3 text-sm leading-relaxed" style={{ color: FOOTER_TEXT }}>
+        <div>
+          <div className="text-[11px] font-medium uppercase tracking-wide" style={{ color: FOOTER_LABEL }}>
+            Địa chỉ
+          </div>
+          <p className="m-0 mt-1">{address}</p>
+        </div>
+        {tel ? (
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wide" style={{ color: FOOTER_LABEL }}>
+              Tel
+            </div>
+            {telLink ? (
+              <a
+                href={telLink}
+                className="m-0 mt-1 block text-inherit underline-offset-2 transition-colors hover:text-white hover:underline"
+              >
+                {tel}
+              </a>
+            ) : (
+              <p className="m-0 mt-1">{tel}</p>
+            )}
+          </div>
+        ) : null}
+        {em ? (
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wide" style={{ color: FOOTER_LABEL }}>
+              Email
+            </div>
+            <a
+              href={`mailto:${em}`}
+              className="m-0 mt-1 block break-all text-inherit underline-offset-2 transition-colors hover:text-white hover:underline"
+            >
+              {em}
+            </a>
+          </div>
+        ) : null}
+        {hotline ? (
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wide" style={{ color: FOOTER_LABEL }}>
+              Hotline
+            </div>
+            {hotLink ? (
+              <a
+                href={hotLink}
+                className="m-0 mt-1 block text-inherit underline-offset-2 transition-colors hover:text-white hover:underline"
+              >
+                {hotline}
+              </a>
+            ) : (
+              <p className="m-0 mt-1">{hotline}</p>
+            )}
+          </div>
+        ) : null}
+      </div>
+    </div>
   )
 }
 
 export default function SiteFooter({ site }) {
   const companyName = site?.companyName || 'Savytech'
   const footer = safeJsonObject(site?.footerJson, null)
-  const offices = Array.isArray(footer?.offices) ? footer.offices : []
   const year = new Date().getFullYear()
   const [showScrollTop, setShowScrollTop] = useState(false)
 
-  const contactHeading =
-    String(footer?.contactHeading || '').trim() || 'Trung tâm Thu hút Nguồn nhân lực'
+  const brandName = String(footer?.brandName || 'SAVYTECH').trim()
+  const brandLogoSrc =
+    String(footer?.brandLogoUrl || '/footer-brand-mark.png').trim() || '/footer-brand-mark.png'
+  const tagline = String(footer?.tagline || 'The Foundation of Success').trim()
+  const companyLegalName =
+    String(
+      footer?.companyLegalName ||
+        'CÔNG TY TNHH KINH DOANH VÀ GIẢI PHÁP CÔNG NGHỆ SAVYTECH',
+    ).trim()
 
-  const addresses = useMemo(() => {
-    const fromField = Array.isArray(footer?.addresses)
-      ? footer.addresses.map((x) => String(x || '').trim()).filter(Boolean)
-      : []
-    if (fromField.length) return fromField
-    return offices.map((o) => String(o?.address || '').trim()).filter(Boolean)
-  }, [footer?.addresses, offices])
-
-  const contactEmail = useMemo(() => {
-    const direct = String(footer?.contactEmail || '').trim()
-    if (direct) return direct
-    const fromOffice = offices.map((o) => String(o?.email || '').trim()).find(Boolean)
-    return fromOffice || ''
-  }, [footer?.contactEmail, offices])
-
-  const contactPhone = useMemo(() => {
-    const direct = String(footer?.contactPhone || '').trim()
-    if (direct) return direct
-    const fromOffice = offices.map((o) => String(o?.phone || '').trim()).find(Boolean)
-    return fromOffice || ''
-  }, [footer?.contactPhone, offices])
-
-  const linkColumns = useMemo(
-    () => normalizeLinkColumns(footer?.linkColumns, companyName),
-    [footer?.linkColumns, companyName],
-  )
-
-  const socialBar = footer?.socialBar && typeof footer.socialBar === 'object' ? footer.socialBar : {}
-  const socialTitle = String(socialBar.title || '').trim() || 'Theo dõi các kênh chính thức'
-  const socialSubtitle =
-    String(socialBar.subtitle || '').trim() || `của ${companyName}`
-  const supportLabel = String(socialBar.supportLabel || '').trim() || 'Hỗ trợ Khách hàng'
-  const supportEmail = String(socialBar.supportEmail || '').trim() || contactEmail
-  const hotlineLabel = String(socialBar.hotlineLabel || '').trim() || 'Hotline'
-  const hotline = String(socialBar.hotline || '').trim() || contactPhone
-
-  const socialLinks = useMemo(() => {
-    const raw = Array.isArray(socialBar.links) ? socialBar.links : []
-    const byType = (t) => String(raw.find((x) => x?.type === t)?.href || '').trim()
-    return [
-      { type: 'facebook', href: byType('facebook') },
-      { type: 'youtube', href: byType('youtube') },
-      { type: 'instagram', href: byType('instagram') },
-      { type: 'zalo', href: byType('zalo') },
-    ]
-  }, [socialBar.links])
+  const offices = useMemo(() => normalizeOffices(footer?.offices), [footer?.offices])
 
   const copyright =
     String(footer?.copyright || '').trim() ||
-    `Copyright © ${year}. Official Website Tuyển dụng của ${companyName}.`
+    `Copyright © ${year}. ${companyName}.`
 
   useEffect(() => {
     function onScroll() {
@@ -237,129 +229,39 @@ export default function SiteFooter({ site }) {
     }
   }, [])
 
-  const linkCls = 'space-y-2.5'
+  const [hq, hanoi, danang] = offices
 
   return (
-    <footer className="border-t bg-white font-sans text-[#002060]">
-      <div className="mx-auto max-w-6xl px-4 py-10 md:py-12 lg:max-w-[1200px]">
-        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-4 lg:gap-8">
-          {/* Cột 1 — Liên hệ */}
-          <div className="min-w-0">
-            <h3 className="text-[15px] font-bold leading-snug" style={{ color: NAVY }}>
-              {contactHeading}
-            </h3>
-            <div className="mt-4 space-y-3 text-sm leading-relaxed" style={{ color: MUTED }}>
-              {addresses.length ? (
-                addresses.map((line, idx) => (
-                  <p key={idx} className="m-0">
-                    {line}
-                  </p>
-                ))
-              ) : offices.length ? (
-                offices.map((o, idx) => (
-                  <div key={idx}>
-                    {o.title ? (
-                      <div className="font-semibold text-[#444444]">{o.title}</div>
-                    ) : null}
-                    {o.address ? <p className="m-0 mt-1">{o.address}</p> : null}
-                  </div>
-                ))
-              ) : (
-                <p className="m-0">Thông tin liên hệ đang được cập nhật.</p>
-              )}
-              {contactEmail ? (
-                <p className="m-0">
-                  <a
-                    href={`mailto:${contactEmail}`}
-                    className="text-[#444444] underline-offset-2 hover:text-[#002060] hover:underline"
-                  >
-                    {contactEmail}
-                  </a>
-                </p>
-              ) : null}
-              {contactPhone ? (
-                <p className="m-0">
-                  <a
-                    href={`tel:${contactPhone.replace(/\s+/g, '')}`}
-                    className="text-[#444444] underline-offset-2 hover:text-[#002060] hover:underline"
-                  >
-                    {contactPhone}
-                  </a>
-                </p>
-              ) : null}
+    <footer className="font-sans" style={{ backgroundColor: FOOTER_BG, color: FOOTER_TEXT }}>
+      <div className="mx-auto max-w-6xl px-4 py-12 lg:max-w-[1200px] lg:py-14">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-4 lg:gap-12">
+          {/* Cột 1 — Thương hiệu */}
+          <div className="min-w-0 lg:pr-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <img
+                src={brandLogoSrc}
+                alt=""
+                width={44}
+                height={44}
+                className="h-11 w-11 shrink-0 rounded-[10px] object-contain"
+                decoding="async"
+              />
+              <span className="text-[1.35rem] font-bold tracking-wide text-white">{brandName}</span>
             </div>
+            <p className="mt-2 text-sm text-white/90">{tagline}</p>
+            <p className="mt-5 text-[11px] font-medium uppercase leading-relaxed tracking-wide text-white/75">
+              {companyLegalName}
+            </p>
           </div>
 
-          {linkColumns.map((col, i) => (
-            <div key={`${col.title}-${i}`} className="min-w-0">
-              <h3 className="text-[15px] font-bold leading-snug" style={{ color: NAVY }}>
-                {col.title}
-              </h3>
-              <nav className={`mt-4 ${linkCls}`} aria-label={col.title}>
-                {col.links.map((l, j) => (
-                  <div key={`${l.label}-${j}`}>
-                    <FooterNavLink href={l.href}>{l.label}</FooterNavLink>
-                  </div>
-                ))}
-              </nav>
-            </div>
-          ))}
+          <OfficeBlock {...hq} />
+          <OfficeBlock {...hanoi} />
+          <OfficeBlock {...danang} />
         </div>
 
-        {/* Thanh social & hỗ trợ */}
         <div
-          className="mt-10 flex flex-col gap-6 rounded-xl border bg-[#fafafa] px-5 py-5 md:px-6 md:py-6 lg:flex-row lg:items-center lg:justify-between lg:gap-8"
-          style={{ borderColor: BORDER }}
+          className="mt-12 border-t border-white/10 pt-8 text-center text-xs leading-relaxed text-white/45 md:text-left"
         >
-          <div className="min-w-0 shrink-0 lg:max-w-md">
-            <div className="text-[15px] font-bold leading-snug" style={{ color: NAVY }}>
-              {socialTitle}
-            </div>
-            <div className="mt-1 text-sm" style={{ color: MUTED }}>
-              {socialSubtitle}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end lg:gap-8">
-            <div className="text-sm">
-              <div className="font-bold" style={{ color: NAVY }}>
-                {supportLabel}
-              </div>
-              {supportEmail ? (
-                <a
-                  href={`mailto:${supportEmail}`}
-                  className="mt-0.5 block text-[#444444] underline-offset-2 hover:text-[#002060] hover:underline"
-                >
-                  {supportEmail}
-                </a>
-              ) : (
-                <span className="mt-0.5 block text-[#999999]">—</span>
-              )}
-            </div>
-            <div className="text-sm">
-              <div className="font-bold" style={{ color: NAVY }}>
-                {hotlineLabel}
-              </div>
-              {hotline ? (
-                <a
-                  href={`tel:${hotline.replace(/\s+/g, '')}`}
-                  className="mt-0.5 block text-[#444444] underline-offset-2 hover:text-[#002060] hover:underline"
-                >
-                  {hotline}
-                </a>
-              ) : (
-                <span className="mt-0.5 block text-[#999999]">—</span>
-              )}
-            </div>
-            <div className="flex items-center gap-3 sm:pl-2">
-              {socialLinks.map((s) => (
-                <SocialCircle key={s.type} type={s.type} href={s.href} />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-10 border-t pt-6 text-center text-xs leading-relaxed md:text-left" style={{ borderColor: BORDER, color: '#888888' }}>
           {copyright}
         </div>
       </div>
@@ -368,7 +270,7 @@ export default function SiteFooter({ site }) {
         type="button"
         aria-label="Về đầu trang"
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        className={`fixed bottom-6 right-6 z-50 grid h-11 w-11 place-items-center rounded-full border border-[#002060]/20 bg-[#002060] text-white shadow-md transition-all duration-200 hover:bg-[#001547] ${
+        className={`fixed bottom-6 right-6 z-50 grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-[#2b4a8c] text-white shadow-lg transition-all duration-200 hover:bg-[#223d73] ${
           showScrollTop ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
         }`}
       >

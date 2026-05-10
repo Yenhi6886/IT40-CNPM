@@ -6,6 +6,7 @@ public record CvApplicationDto(
     Long id,
     Long jobId,
     String jobTitle,
+    String workArrangement,
     String fullName,
     String email,
     String phone,

@@ -12,6 +12,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -62,11 +63,25 @@ public class AdminCvController {
         return toDto(saved);
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable long id) throws IOException {
+        CvApplication app = cvRepo.findById(id).orElseThrow(() -> new IllegalArgumentException("CV not found"));
+        Path uploadRoot = Path.of("uploads", "cv").toAbsolutePath().normalize();
+        Path filePath = Path.of(app.getCvStoredPath()).toAbsolutePath().normalize();
+        if (!filePath.startsWith(uploadRoot)) {
+            throw new IllegalArgumentException("Invalid CV file path");
+        }
+        cvRepo.delete(app);
+        Files.deleteIfExists(filePath);
+        return ResponseEntity.noContent().build();
+    }
+
     private CvApplicationDto toDto(CvApplication a) {
         return new CvApplicationDto(
             a.getId(),
             a.getJobId(),
             a.getJobTitle(),
+            a.getWorkArrangement(),
             a.getFullName(),
             a.getEmail(),
             a.getPhone(),

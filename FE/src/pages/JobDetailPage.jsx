@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import DOMPurify from 'dompurify'
 import { publicApi } from '@/lib/api'
@@ -90,7 +90,10 @@ export default function JobDetailPage() {
   const [applyPhone, setApplyPhone] = useState('')
   const [applyCvFile, setApplyCvFile] = useState(null)
   const [applySource, setApplySource] = useState('')
+  const [applySelectedJobId, setApplySelectedJobId] = useState('')
+  const [applyCustomJobTitle, setApplyCustomJobTitle] = useState('')
   const [toast, setToast] = useState({ open: false })
+  const applyCvInputRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -98,20 +101,13 @@ export default function JobDetailPage() {
     Promise.all([
       publicApi.site(),
       Number.isFinite(jobId) ? publicApi.job(jobId) : Promise.reject(new Error('Job not found')),
+      publicApi.jobs().catch(() => []),
     ])
-      .then(([s, j]) => {
+      .then(([s, j, list]) => {
         if (cancelled) return
         setSite(s)
         setJob(j)
-        publicApi
-          .jobs()
-          .then((list) => {
-            if (cancelled) return
-            setPublicJobs(Array.isArray(list) ? list : [])
-          })
-          .catch(() => {
-            if (!cancelled) setPublicJobs([])
-          })
+        setPublicJobs(Array.isArray(list) ? list : [])
       })
       .catch((e) => {
         if (cancelled) return
@@ -121,6 +117,14 @@ export default function JobDetailPage() {
       cancelled = true
     }
   }, [jobId])
+
+  useEffect(() => {
+    if (!job?.id) return
+    const idStr = String(job.id)
+    const ids = new Set(publicJobs.map((x) => String(x?.id)))
+    setApplySelectedJobId(ids.has(idStr) ? idStr : '')
+    setApplyCustomJobTitle('')
+  }, [job?.id, publicJobs])
 
   const companyName = site?.companyName || 'Savytech'
 
@@ -145,7 +149,7 @@ export default function JobDetailPage() {
         <section className="border-b border-border/60 bg-muted/10">
           <div className="mx-auto max-w-6xl px-4 py-2">
             <nav className="text-xs text-muted-foreground md:text-sm">
-              <Link className="transition-colors hover:text-primary" to="/careers">
+              <Link className="transition-colors hover:text-primary" to="/careers#jobs">
                 Cơ hội nghề nghiệp
               </Link>
             </nav>
@@ -328,25 +332,14 @@ export default function JobDetailPage() {
         ) : null}
 
         <section id="apply" className="border-t bg-white">
-          <div className="mx-auto max-w-6xl px-4 py-14">
-            <h2 className="text-center text-4xl font-extrabold tracking-tight">
+          <div className="mx-auto max-w-xl px-4 py-14">
+            <h2 className="text-center text-2xl font-bold tracking-tight text-foreground md:text-3xl">
               <span className="text-primary">Ứng</span> tuyển ngay
             </h2>
 
-            <div className="mt-10 grid grid-cols-1 gap-8 md:grid-cols-2">
-              <div className="overflow-hidden rounded-2xl border bg-muted/20">
-                {site?.careersHeroBackgroundUrl ? (
-                  <img src={site.careersHeroBackgroundUrl} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="grid aspect-[4/3] place-items-center text-sm text-muted-foreground">
-                    Ảnh (admin upload)
-                  </div>
-                )}
-              </div>
-
-              <form
-                className="rounded-2xl border bg-white p-6 shadow-sm"
-                onSubmit={async (e) => {
+            <form
+              className="mt-8 space-y-5 rounded-xl border border-border bg-white p-6 shadow-sm md:p-8"
+              onSubmit={async (e) => {
                   e.preventDefault()
                   try {
                     if (!applyName.trim()) throw new Error('Vui lòng nhập họ và tên')
@@ -355,9 +348,16 @@ export default function JobDetailPage() {
                     if (!applyCvFile) throw new Error('Vui lòng chọn CV')
                     if (!isValidCvFile(applyCvFile)) throw new Error('CV chỉ chấp nhận định dạng pdf/doc/docx')
                     if (applyCvFile.size > 10 * 1024 * 1024) throw new Error('CV tối đa 10MB')
-                    if (!job?.id) throw new Error('Job không hợp lệ')
+                    if (!applySelectedJobId) throw new Error('Vui lòng chọn vị trí ứng tuyển')
+                    const picked = Number(applySelectedJobId)
+                    if (picked === 0) {
+                      if (!applyCustomJobTitle.trim()) throw new Error('Vui lòng nhập vị trí mong muốn')
+                    } else if (!Number.isFinite(picked) || picked <= 0) {
+                      throw new Error('Vị trí không hợp lệ')
+                    }
                     const form = new FormData()
-                    form.append('jobId', String(job.id))
+                    form.append('jobId', String(picked))
+                    if (picked === 0) form.append('customJobTitle', applyCustomJobTitle.trim())
                     form.append('fullName', applyName)
                     form.append('email', applyEmail)
                     form.append('phone', applyPhone)
@@ -375,6 +375,14 @@ export default function JobDetailPage() {
                     setApplyPhone('')
                     setApplyCvFile(null)
                     setApplySource('')
+                    setApplyCustomJobTitle('')
+                    if (job?.id) {
+                      const idStr = String(job.id)
+                      const ids = new Set(publicJobs.map((x) => String(x?.id)))
+                      setApplySelectedJobId(ids.has(idStr) ? idStr : '')
+                    } else {
+                      setApplySelectedJobId('')
+                    }
                   } catch (err) {
                     setToast({
                       open: true,
@@ -384,78 +392,136 @@ export default function JobDetailPage() {
                     })
                   }
                 }}
-              >
-                <div className="space-y-4">
-                  <div>
-                    <div className="text-sm font-medium">Họ và tên *</div>
-                    <input
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                      value={applyName}
-                      onChange={(e) => setApplyName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">Email *</div>
-                    <input
-                      type="email"
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                      value={applyEmail}
-                      onChange={(e) => setApplyEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">Số điện thoại *</div>
-                    <input
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                      value={applyPhone}
-                      onChange={(e) => setApplyPhone(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">Vị trí *</div>
-                    <input
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                      value={job?.title || ''}
-                      readOnly
-                      required
-                    />
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">CV ứng tuyển *</div>
-                    <div className="mt-1 rounded-md border bg-muted/10 p-4 text-center">
-                      <div className="text-sm text-muted-foreground">Kéo thả hoặc tải lên CV của bạn</div>
-                      <div className="mt-3">
-                        <input
-                          type="file"
-                          accept=".pdf,.doc,.docx"
-                          onChange={(e) => setApplyCvFile(e.target.files?.[0] || null)}
-                          required
-                        />
-                        {applyCvFile ? (
-                          <div className="mt-2 text-xs text-muted-foreground">{applyCvFile.name}</div>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">Bạn biết đến thông tin tuyển dụng qua đâu?</div>
-                    <input
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                      value={applySource}
-                      onChange={(e) => setApplySource(e.target.value)}
-                      placeholder="Facebook, LinkedIn, bạn bè..."
-                    />
-                  </div>
-
-                  <Button type="submit" className="w-full bg-primary">
-                    Gửi ứng tuyển
+            >
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">CV ứng tuyển *</div>
+                <div
+                  className="mx-auto mt-2 max-w-md cursor-pointer rounded-xl border-2 border-dashed border-primary/45 bg-muted/5 px-4 py-8 text-center transition-colors hover:bg-muted/10"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => applyCvInputRef.current?.click()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      applyCvInputRef.current?.click()
+                    }
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    const f = e.dataTransfer.files?.[0]
+                    if (f && isValidCvFile(f)) setApplyCvFile(f)
+                  }}
+                >
+                  <input
+                    ref={applyCvInputRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    className="sr-only"
+                    onChange={(e) => setApplyCvFile(e.target.files?.[0] || null)}
+                  />
+                  <p className="text-sm font-semibold text-primary">Kéo thả hoặc tải lên CV của bạn</p>
+                  <p className="mt-1.5 text-xs text-muted-foreground">Chấp nhận file .pdf, .doc, .docx</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 border-primary/30 text-primary hover:bg-primary/5"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      applyCvInputRef.current?.click()
+                    }}
+                  >
+                    Chọn tệp
                   </Button>
+                  {applyCvFile ? (
+                    <p className="mt-3 text-xs font-medium text-foreground">{applyCvFile.name}</p>
+                  ) : (
+                    <p className="mt-3 text-xs text-muted-foreground">Chưa có tệp nào được chọn</p>
+                  )}
                 </div>
-              </form>
-            </div>
+              </div>
+
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Họ và tên *</div>
+                <input
+                  className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
+                  value={applyName}
+                  onChange={(e) => setApplyName(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Email *</div>
+                <input
+                  type="email"
+                  className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
+                  value={applyEmail}
+                  onChange={(e) => setApplyEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Số điện thoại *</div>
+                <input
+                  className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
+                  value={applyPhone}
+                  onChange={(e) => setApplyPhone(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Vị trí ứng tuyển *</div>
+                <select
+                  className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
+                  value={applySelectedJobId}
+                  onChange={(e) => {
+                    setApplySelectedJobId(e.target.value)
+                    if (e.target.value !== '0') setApplyCustomJobTitle('')
+                  }}
+                  required
+                >
+                  <option value="">Chọn vị trí</option>
+                  {publicJobs.map((j) => (
+                    <option key={j.id} value={String(j.id)}>
+                      {j.title}
+                    </option>
+                  ))}
+                  <option value="0">Khác</option>
+                </select>
+                {applySelectedJobId === '0' ? (
+                  <div className="mt-4">
+                    <div className="text-sm font-medium text-muted-foreground">Vị trí mong muốn *</div>
+                    <input
+                      className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
+                      value={applyCustomJobTitle}
+                      onChange={(e) => setApplyCustomJobTitle(e.target.value)}
+                      placeholder="Nhập tên vị trí / công việc"
+                      required
+                    />
+                  </div>
+                ) : null}
+              </div>
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">
+                  Bạn biết đến thông tin tuyển dụng qua đâu?
+                </div>
+                <input
+                  className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
+                  value={applySource}
+                  onChange={(e) => setApplySource(e.target.value)}
+                  placeholder="Facebook, LinkedIn, bạn bè..."
+                />
+              </div>
+
+              <Button type="submit" className="w-full rounded-lg bg-primary py-2.5 font-semibold shadow-sm">
+                Gửi ứng tuyển
+              </Button>
+            </form>
           </div>
         </section>
       </main>

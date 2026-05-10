@@ -5,7 +5,6 @@ import com.example.be.content.dto.JobPostingDto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -40,7 +39,7 @@ public class PublicCvController {
 
     @PostMapping(value = "/apply", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> apply(
-        @Positive(message = "jobId must be > 0") @RequestParam("jobId") long jobId,
+        @RequestParam("jobId") long jobId,
         @NotBlank(message = "fullName is required")
         @Size(max = 200, message = "fullName is too long")
         @RequestParam("fullName") String fullName,
@@ -53,6 +52,8 @@ public class PublicCvController {
         @RequestParam("phone") String phone,
         @Size(max = 300, message = "source is too long")
         @RequestParam(value = "source", required = false) String source,
+        @Size(max = 200, message = "customJobTitle is too long")
+        @RequestParam(value = "customJobTitle", required = false) String customJobTitle,
         @RequestParam("cv") MultipartFile cv
     ) throws IOException {
         if (cv == null || cv.isEmpty()) {
@@ -71,7 +72,27 @@ public class PublicCvController {
             return ResponseEntity.badRequest().body(Map.of("message", "Invalid CV content type"));
         }
 
-        JobPostingDto job = contentService.getPublicJob(jobId);
+        if (jobId < 0) {
+            return ResponseEntity.badRequest().body(Map.of("message", "jobId không hợp lệ"));
+        }
+
+        final long persistedJobId;
+        final String resolvedTitle;
+        final String resolvedWork;
+        if (jobId == 0) {
+            String custom = customJobTitle == null ? "" : customJobTitle.trim();
+            if (custom.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Vui lòng nhập vị trí mong muốn"));
+            }
+            persistedJobId = 0L;
+            resolvedTitle = custom;
+            resolvedWork = null;
+        } else {
+            JobPostingDto job = contentService.getPublicJob(jobId);
+            persistedJobId = job.id();
+            resolvedTitle = job.title();
+            resolvedWork = normalizeWorkSnapshot(job.workArrangement());
+        }
 
         Files.createDirectories(uploadDir);
         String stored = UUID.randomUUID() + (ext.isEmpty() ? "" : "." + ext);
@@ -84,8 +105,9 @@ public class PublicCvController {
         }
 
         CvApplication app = new CvApplication();
-        app.setJobId(job.id());
-        app.setJobTitle(job.title());
+        app.setJobId(persistedJobId);
+        app.setJobTitle(resolvedTitle);
+        app.setWorkArrangement(resolvedWork);
         app.setFullName(String.valueOf(fullName == null ? "" : fullName).trim());
         app.setEmail(String.valueOf(email == null ? "" : email).trim());
         app.setPhone(String.valueOf(phone == null ? "" : phone).trim());
@@ -114,6 +136,14 @@ public class PublicCvController {
             || contentType.equals("application/msword")
             || contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
             || contentType.equals("application/octet-stream");
+    }
+
+    /** Lưu null nếu job là ALL / trống — admin lọc nhóm “không xác định”. */
+    private static String normalizeWorkSnapshot(String raw) {
+        if (raw == null) return null;
+        String v = raw.trim().toUpperCase(Locale.ROOT);
+        if (v.isEmpty() || v.equals("ALL")) return null;
+        return v;
     }
 }
 

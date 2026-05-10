@@ -27,6 +27,13 @@ public record JobPostingDto(
     String jobType,
     @Size(max = 200, message = "Salary must be at most 200 characters")
     String salary,
+    Boolean salaryNegotiable,
+    @Min(value = 0, message = "salaryMinMillion must be >= 0")
+    @Max(value = 500, message = "salaryMinMillion must be at most 500")
+    Integer salaryMinMillion,
+    @Min(value = 0, message = "salaryMaxMillion must be >= 0")
+    @Max(value = 500, message = "salaryMaxMillion must be at most 500")
+    Integer salaryMaxMillion,
     @Min(value = 1, message = "recruitmentHeadcount must be >= 1")
     @Max(value = 99999, message = "recruitmentHeadcount is too large")
     Integer recruitmentHeadcount,
@@ -40,6 +47,7 @@ public record JobPostingDto(
     @Size(max = 30000, message = "Description is too long")
     String description,
     boolean published,
+    boolean hot,
     @Min(value = 0, message = "sortOrder must be >= 0")
     @Max(value = 100000, message = "sortOrder is too large")
     int sortOrder

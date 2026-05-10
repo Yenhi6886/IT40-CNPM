@@ -8,14 +8,11 @@ import SiteFooter from '@/components/SiteFooter'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Toast from '@/components/Toast'
 import {
-  ArrowRight,
   BriefcaseBusiness,
   CircleDollarSign,
   Clock,
-  LayoutGrid,
-  List,
   MapPin,
-  Sparkles,
+  RotateCcw,
   Zap,
 } from 'lucide-react'
 
@@ -33,12 +30,29 @@ const SALARY_BUCKETS = [
   { id: '10-15', label: '10 – 15 triệu' },
   { id: '15-20', label: '15 – 20 triệu' },
   { id: '20-25', label: '20 – 25 triệu' },
-  { id: '25+', label: 'Trên 25 triệu' },
+  { id: '25-30', label: '25 – 30 triệu' },
+  { id: '30+', label: 'Trên 30 triệu' },
 ]
 
-const LEVEL_FILTERS = [
-  { id: 'staff', label: 'Nhân viên' },
-  { id: 'manager', label: 'Quản lý' },
+/** Khoảng lương (triệu/tháng, hai đầu gồm) để lọc theo giao với khoảng tin tuyển dụng. */
+const SALARY_FILTER_RANGES = {
+  '0-10': [0, 10],
+  '10-15': [10, 15],
+  '15-20': [15, 20],
+  '20-25': [20, 25],
+  '25-30': [25, 30],
+  '30+': [30, 500],
+}
+
+const PAGE_SIZE = 9
+
+function intervalsOverlapMillion(aLo, aHi, bLo, bHi) {
+  return aLo <= bHi && aHi >= bLo
+}
+
+const JOB_SECTOR_FILTERS = [
+  { id: 'IT', label: 'IT' },
+  { id: 'NON_IT', label: 'Non-IT' },
 ]
 
 const WORK_TYPE_FILTERS = [
@@ -71,8 +85,24 @@ function shortLocation(address) {
   return s.length > 36 ? `${s.slice(0, 33)}…` : s
 }
 
-/** Gán bucket lương từ text (heuristic). */
+/** Gán một bucket “đại diện” (hiển thị / tin cũ): ưu tiên cấu trúc, sau đó heuristic chuỗi. */
 function getSalaryBucket(job) {
+  if (job?.salaryNegotiable === true) return 'negotiable'
+  const smin = job?.salaryMinMillion
+  const smax = job?.salaryMaxMillion
+  if (smin != null && smax != null) {
+    const a = Number(smin)
+    const b = Number(smax)
+    if (Number.isFinite(a) && Number.isFinite(b)) {
+      const mid = (a + b) / 2
+      if (mid <= 10) return '0-10'
+      if (mid <= 15) return '10-15'
+      if (mid <= 20) return '15-20'
+      if (mid <= 25) return '20-25'
+      if (mid <= 30) return '25-30'
+      return '30+'
+    }
+  }
   const raw = String(job?.salary || '').trim().toLowerCase()
   if (!raw || /thỏa thuận|thương lượng|negotiat|deal|lương\s*cạnh/.test(raw)) return 'negotiable'
   const nums = []
@@ -92,13 +122,53 @@ function getSalaryBucket(job) {
   if (mid <= 15) return '10-15'
   if (mid <= 20) return '15-20'
   if (mid <= 25) return '20-25'
-  return '25+'
+  if (mid <= 30) return '25-30'
+  return '30+'
 }
 
-function getJobLevel(job) {
-  const t = String(job?.title || '').toLowerCase()
-  if (/quản lý|manager|lead|director|head|trưởng|giám đốc|chief|supervisor/.test(t)) return 'manager'
-  return 'staff'
+/** Tin có khớp một mức lọc lương không (theo giao khoảng khi có min/max). */
+function jobMatchesSalaryFilterBucket(job, bucketId) {
+  if (bucketId === 'negotiable') {
+    if (job?.salaryNegotiable === true) return true
+    const smin = job?.salaryMinMillion
+    const smax = job?.salaryMaxMillion
+    if (smin != null && smax != null) {
+      const a = Number(smin)
+      const b = Number(smax)
+      if (Number.isFinite(a) && Number.isFinite(b)) return false
+    }
+    const raw = String(job?.salary || '').trim().toLowerCase()
+    if (!raw || /thỏa thuận|thương lượng|negotiat|deal|lương\s*cạnh/.test(raw)) return true
+    return getSalaryBucket(job) === 'negotiable'
+  }
+  const range = SALARY_FILTER_RANGES[bucketId]
+  if (!range) return false
+  const [bLo, bHi] = range
+  const smin = job?.salaryMinMillion
+  const smax = job?.salaryMaxMillion
+  if (smin != null && smax != null) {
+    const a = Number(smin)
+    const b = Number(smax)
+    if (Number.isFinite(a) && Number.isFinite(b)) {
+      const jLo = Math.min(a, b)
+      const jHi = Math.max(a, b)
+      return intervalsOverlapMillion(jLo, jHi, bLo, bHi)
+    }
+  }
+  return getSalaryBucket(job) === bucketId
+}
+
+function jobMatchesSalaryFilters(job, selectedIds) {
+  if (!selectedIds?.length) return true
+  return selectedIds.some((id) => jobMatchesSalaryFilterBucket(job, id))
+}
+
+function countSalaryFilterMatches(jobs, bucketId) {
+  let n = 0
+  for (const j of jobs || []) {
+    if (jobMatchesSalaryFilterBucket(j, bucketId)) n++
+  }
+  return n
 }
 
 function countByBucket(jobs, fnBucket) {
@@ -184,6 +254,10 @@ function isItJob(job) {
   return itKeywords.some((k) => title.includes(k))
 }
 
+function getJobSectorBucket(job) {
+  return isItJob(job) ? 'IT' : 'NON_IT'
+}
+
 function paginate(items, page, pageSize) {
   const total = items.length
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
@@ -217,24 +291,25 @@ export default function CareersPage() {
   const [jobs, setJobs] = useState([])
   const [error, setError] = useState(null)
   const [listPage, setListPage] = useState(1)
-  const [pageSize, setPageSize] = useState(12)
   const [sortMode, setSortMode] = useState('newest') // newest | oldest | title
-  const [viewMode, setViewMode] = useState('grid') // grid | list
   const [salaryFilters, setSalaryFilters] = useState([])
-  const [levelFilters, setLevelFilters] = useState([])
+  const [sectorFilters, setSectorFilters] = useState([])
   const [workFilters, setWorkFilters] = useState([])
   const [regionOpen, setRegionOpen] = useState(false)
   const [regionValue, setRegionValue] = useState('')
+  const [jobTitleOpen, setJobTitleOpen] = useState(false)
   const [jobKeyword, setJobKeyword] = useState('')
   const [applyName, setApplyName] = useState('')
   const [applyEmail, setApplyEmail] = useState('')
   const [applyPhone, setApplyPhone] = useState('')
   const [applyJobId, setApplyJobId] = useState('')
+  const [applyCustomJobTitle, setApplyCustomJobTitle] = useState('')
   const [applyCvFile, setApplyCvFile] = useState(null)
   const [applySource, setApplySource] = useState('')
   const [toast, setToast] = useState({ open: false })
   const [selectedJobId, setSelectedJobId] = useState(null)
   const detailRef = useRef(null)
+  const applyCvInputRef = useRef(null)
   const [careersHeroReady, setCareersHeroReady] = useState(false)
 
   useEffect(() => {
@@ -289,17 +364,33 @@ export default function CareersPage() {
 
   useEffect(() => {
     if (!selectedJobId) return
+    const idStr = String(selectedJobId)
+    if (jobs.some((j) => String(j?.id) === idStr)) {
+      setApplyJobId(idStr)
+      setApplyCustomJobTitle('')
+    }
+  }, [selectedJobId, jobs])
+
+  useEffect(() => {
+    if (!selectedJobId) return
     const t = setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
     return () => clearTimeout(t)
   }, [selectedJobId])
 
   useEffect(() => {
-    if (String(location?.hash || '') !== '#apply') return
-    const t = setTimeout(() => {
-      const el = document.getElementById('apply')
-      el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 50)
-    return () => clearTimeout(t)
+    const h = String(location?.hash || '')
+    if (h === '#apply') {
+      const t = setTimeout(() => {
+        document.getElementById('apply')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 50)
+      return () => clearTimeout(t)
+    }
+    if (h === '#jobs') {
+      const t = setTimeout(() => {
+        document.getElementById('jobs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 80)
+      return () => clearTimeout(t)
+    }
   }, [location?.hash])
 
   const selectedJob = useMemo(
@@ -307,25 +398,44 @@ export default function CareersPage() {
     [jobs, selectedJobId],
   )
 
-  const companyName = site?.companyName || 'Savytech'
+  const jobTitleOptions = useMemo(() => {
+    const s = new Set()
+    for (const j of jobs || []) {
+      const t = String(j?.title || '').trim()
+      if (t) s.add(t)
+    }
+    return [...s].sort((a, b) => a.localeCompare(b, 'vi'))
+  }, [jobs])
 
   const filteredJobs = useMemo(() => {
-    const keyword = String(jobKeyword || '').trim().toLowerCase()
+    const keywordRaw = String(jobKeyword || '').trim()
+    const keyword = keywordRaw.toLowerCase()
     const region = String(regionValue || '').trim().toLowerCase()
+    const exactTitle = jobTitleOptions.includes(keywordRaw)
     return (jobs || []).filter((j) => {
-      const title = String(j?.title || '').toLowerCase()
+      const title = String(j?.title || '').trim()
+      const titleLc = title.toLowerCase()
       const address = String(j?.address || '').toLowerCase()
       const salary = String(j?.salary || '').toLowerCase()
       const description = String(j?.description || '').toLowerCase()
-      const byKeyword =
-        !keyword || [title, address, salary, description].some((field) => field.includes(keyword))
+      let byKeyword = true
+      if (keyword) {
+        if (exactTitle) byKeyword = title === keywordRaw
+        else byKeyword = [titleLc, address, salary, description].some((field) => field.includes(keyword))
+      }
       const byRegion = !region || address.includes(region)
       return byKeyword && byRegion
     })
-  }, [jobs, jobKeyword, regionValue])
+  }, [jobs, jobKeyword, regionValue, jobTitleOptions])
 
-  const salaryCounts = useMemo(() => countByBucket(filteredJobs, getSalaryBucket), [filteredJobs])
-  const levelCounts = useMemo(() => countByBucket(filteredJobs, getJobLevel), [filteredJobs])
+  const salaryCounts = useMemo(() => {
+    const m = {}
+    for (const b of SALARY_BUCKETS) {
+      m[b.id] = countSalaryFilterMatches(filteredJobs, b.id)
+    }
+    return m
+  }, [filteredJobs])
+  const sectorCounts = useMemo(() => countByBucket(filteredJobs, getJobSectorBucket), [filteredJobs])
   const workCounts = useMemo(() => {
     const m = {}
     for (const j of filteredJobs || []) {
@@ -340,10 +450,10 @@ export default function CareersPage() {
     let list = [...(filteredJobs || [])]
 
     if (salaryFilters.length) {
-      list = list.filter((j) => salaryFilters.includes(getSalaryBucket(j)))
+      list = list.filter((j) => jobMatchesSalaryFilters(j, salaryFilters))
     }
-    if (levelFilters.length) {
-      list = list.filter((j) => levelFilters.includes(getJobLevel(j)))
+    if (sectorFilters.length) {
+      list = list.filter((j) => sectorFilters.includes(getJobSectorBucket(j)))
     }
     if (workFilters.length) {
       list = list.filter((j) => {
@@ -369,13 +479,16 @@ export default function CareersPage() {
       return idb - ida
     })
     return list
-  }, [filteredJobs, salaryFilters, levelFilters, workFilters, sortMode])
+  }, [filteredJobs, salaryFilters, sectorFilters, workFilters, sortMode])
 
-  const listPaged = useMemo(() => paginate(marketplaceJobs, listPage, pageSize), [marketplaceJobs, listPage, pageSize])
+  const listPaged = useMemo(
+    () => paginate(marketplaceJobs, listPage, PAGE_SIZE),
+    [marketplaceJobs, listPage],
+  )
 
   useEffect(() => {
     setListPage(1)
-  }, [jobKeyword, regionValue, salaryFilters, levelFilters, workFilters, pageSize, sortMode])
+  }, [jobKeyword, regionValue, salaryFilters, sectorFilters, workFilters, sortMode])
 
   function toggleFilter(arr, setArr, id) {
     setArr((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -383,7 +496,7 @@ export default function CareersPage() {
 
   function resetAdvancedFilters() {
     setSalaryFilters([])
-    setLevelFilters([])
+    setSectorFilters([])
     setWorkFilters([])
     setListPage(1)
   }
@@ -399,18 +512,31 @@ export default function CareersPage() {
     navigate(q ? `/careers?${q}` : '/careers', { replace: true })
   }
 
+  function closeJobDetail() {
+    setSelectedJobId(null)
+    const params = new URLSearchParams(location.search || '')
+    params.delete('jobId')
+    const q = params.toString()
+    navigate(q ? `/careers?${q}` : '/careers', { replace: true })
+    window.setTimeout(() => {
+      document.getElementById('jobs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
+  }
+
   useEffect(() => {
     function onDocClick(e) {
       const target = e.target
       if (!(target instanceof HTMLElement)) return
       if (target.closest?.('[data-region-dropdown]')) return
+      if (target.closest?.('[data-job-title-dropdown]')) return
       setRegionOpen(false)
+      setJobTitleOpen(false)
     }
     document.addEventListener('click', onDocClick)
     return () => document.removeEventListener('click', onDocClick)
   }, [])
 
-  function MarketplaceJobCard({ job, viewMode }) {
+  function MarketplaceJobCard({ job }) {
     const it = isItJob(job)
     const salaryText = String(job?.salary || '').trim()
     const negotiable = !salaryText || /thỏa thuận|thương lượng/i.test(salaryText)
@@ -463,14 +589,6 @@ export default function CareersPage() {
         </div>
       </>
     )
-
-    if (viewMode === 'list') {
-      return (
-        <div className="flex h-full flex-col rounded-xl border border-[#e0e0e0] bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-primary/30 md:flex-row md:items-stretch md:gap-6">
-          <div className="flex min-w-0 flex-1 flex-col">{inner}</div>
-        </div>
-      )
-    }
 
     return (
       <div className="flex h-full flex-col rounded-xl border border-[#e0e0e0] bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-primary/30">
@@ -588,10 +706,6 @@ export default function CareersPage() {
 
           <div className="relative mx-auto flex min-h-[calc(100vh-56px)] max-w-6xl flex-col justify-center px-4 py-16 md:min-h-[calc(100vh-64px)] md:py-20">
             <div className="mx-auto max-w-4xl text-center">
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-white/90 backdrop-blur-md">
-                <Sparkles className="h-3.5 w-3.5 text-amber-300" aria-hidden />
-                {companyName}
-              </div>
               {String(site?.careersHeroTitle || '').trim() ? (
                 <h1 className="text-balance text-4xl font-extrabold tracking-tight text-white drop-shadow-sm md:text-6xl md:leading-[1.08]">
                   {site.careersHeroTitle}
@@ -613,18 +727,66 @@ export default function CareersPage() {
               ) : null}
 
               <div className="mx-auto mt-10 grid w-full max-w-5xl grid-cols-1 gap-3 rounded-2xl border border-white/25 bg-white/[0.12] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.25)] backdrop-blur-xl md:grid-cols-[1.5fr_1.25fr_auto]">
-                <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/95 px-3 text-sm text-muted-foreground shadow-sm">
+                <div
+                  className="relative flex items-center gap-2 rounded-xl border border-white/20 bg-white/95 px-3 text-sm text-muted-foreground shadow-sm"
+                  data-job-title-dropdown
+                >
                   <span className="hidden whitespace-nowrap sm:inline">Công việc</span>
-                  <input
-                    className="h-11 w-full bg-transparent text-foreground outline-none placeholder:text-muted-foreground/80"
-                    placeholder="Tìm công việc phù hợp…"
-                    aria-label="Tìm công việc"
-                    value={jobKeyword}
-                    onChange={(e) => setJobKeyword(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') applySearchFilters(e.currentTarget.value, regionValue)
+                  <button
+                    type="button"
+                    className="flex h-11 min-w-0 w-full items-center justify-between gap-2 bg-transparent text-left text-foreground outline-none"
+                    onClick={() => {
+                      setJobTitleOpen((v) => !v)
+                      setRegionOpen(false)
                     }}
-                  />
+                    aria-label="Chọn công việc"
+                  >
+                    <span
+                      className={`min-w-0 truncate ${
+                        jobKeyword ? 'text-foreground' : 'text-muted-foreground'
+                      }`}
+                    >
+                      {jobTitleOptions.includes(jobKeyword)
+                        ? jobKeyword
+                        : jobKeyword
+                          ? `${jobKeyword} (từ liên kết)`
+                          : 'Chọn công việc'}
+                    </span>
+                    <span className="shrink-0 text-muted-foreground">▾</span>
+                  </button>
+                  {jobTitleOpen ? (
+                    <div
+                      className="absolute left-0 top-[calc(100%+10px)] z-50 w-full max-h-[19rem] overflow-y-auto overscroll-contain rounded-xl border bg-white shadow-xl"
+                      style={{ maxHeight: 'min(19rem, calc(100vh - 180px))' }}
+                      onWheelCapture={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        className="w-full px-4 py-3 text-left text-sm font-medium text-foreground hover:bg-[#e8f0fe]/80"
+                        onClick={() => {
+                          setJobKeyword('')
+                          setJobTitleOpen(false)
+                          applySearchFilters('', regionValue)
+                        }}
+                      >
+                        Tất cả công việc
+                      </button>
+                      {jobTitleOptions.map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-[#e8f0fe]/80"
+                          onClick={() => {
+                            setJobKeyword(t)
+                            setJobTitleOpen(false)
+                            applySearchFilters(t, regionValue)
+                          }}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
                 <div
                   className="relative flex items-center gap-2 rounded-xl border border-white/20 bg-white/95 px-3 text-sm text-muted-foreground shadow-sm"
@@ -634,7 +796,10 @@ export default function CareersPage() {
                   <button
                     type="button"
                     className="flex h-11 w-full items-center justify-between gap-2 bg-transparent text-left text-foreground outline-none"
-                    onClick={() => setRegionOpen((v) => !v)}
+                    onClick={() => {
+                      setRegionOpen((v) => !v)
+                      setJobTitleOpen(false)
+                    }}
                     aria-label="Chọn khu vực"
                   >
                     <span
@@ -650,7 +815,7 @@ export default function CareersPage() {
                       style={{ maxHeight: 'min(22rem, calc(100vh - 180px))' }}
                       onWheelCapture={(e) => e.stopPropagation()}
                     >
-                      {['Hà Nội', 'TP HCM', 'Hải Phòng', 'Đà Nẵng', 'Tokyo', 'Osaka'].map((x) => (
+                      {['Hà Nội', 'Đà Nẵng'].map((x) => (
                         <button
                           key={x}
                           type="button"
@@ -674,23 +839,6 @@ export default function CareersPage() {
                 >
                   Tìm kiếm
                 </Button>
-              </div>
-
-              <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-sm">
-                <a
-                  href="#jobs"
-                  className="inline-flex items-center gap-2 font-semibold text-white/95 underline-offset-4 transition-colors hover:text-white hover:underline"
-                >
-                  Cơ hội nghề nghiệp
-                  <ArrowRight className="h-4 w-4" aria-hidden />
-                </a>
-                <span className="hidden text-white/40 sm:inline">·</span>
-                <Link
-                  to="/benefits"
-                  className="text-white/75 transition-colors hover:text-white"
-                >
-                  Quyền lợi
-                </Link>
               </div>
 
               {error ? <p className="mt-4 text-sm text-red-300">Lỗi: {error}</p> : null}
@@ -724,14 +872,7 @@ export default function CareersPage() {
                     <span>💼 {selectedJob.salary || 'Thỏa thuận'}</span>
                   </div>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedJobId(null)
-                    navigate('/careers', { replace: true })
-                  }}
-                >
+                <Button type="button" variant="outline" onClick={closeJobDetail}>
                   Đóng
                 </Button>
               </div>
@@ -758,9 +899,16 @@ export default function CareersPage() {
                     <h2 className="text-base font-bold text-[#2b4a8c]">Bộ lọc nâng cao</h2>
                     <button
                       type="button"
-                      className="text-xs font-medium text-primary hover:underline"
+                      disabled={
+                        salaryFilters.length === 0 &&
+                        sectorFilters.length === 0 &&
+                        workFilters.length === 0
+                      }
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#c5d2ea] bg-[#f4f7fc] px-2.5 py-1.5 text-xs font-semibold text-[#2b4a8c] shadow-[0_1px_2px_rgba(43,74,140,0.06)] transition-colors hover:border-[#2b4a8c]/35 hover:bg-[#e8eef8] active:bg-[#dde6f4] disabled:pointer-events-none disabled:border-[#e8e8e8] disabled:bg-[#f8f9fb] disabled:text-[#9aa8c4] disabled:shadow-none"
                       onClick={resetAdvancedFilters}
+                      aria-label="Đặt lại tất cả bộ lọc nâng cao"
                     >
+                      <RotateCcw className="size-3.5 shrink-0 opacity-90" strokeWidth={2.25} aria-hidden />
                       Đặt lại
                     </button>
                   </div>
@@ -783,16 +931,16 @@ export default function CareersPage() {
                     </div>
 
                     <div>
-                      <div className="mb-3 text-sm font-bold text-[#2b4a8c]">Vị trí</div>
+                      <div className="mb-3 text-sm font-bold text-[#2b4a8c]">Lĩnh vực</div>
                       <div className="space-y-0.5">
-                        {LEVEL_FILTERS.map((lv) => (
+                        {JOB_SECTOR_FILTERS.map((s) => (
                           <FilterCheckboxRow
-                            key={lv.id}
-                            id={lv.id}
-                            label={lv.label}
-                            count={levelCounts[lv.id] ?? 0}
-                            checked={levelFilters.includes(lv.id)}
-                            onToggle={(id) => toggleFilter(levelFilters, setLevelFilters, id)}
+                            key={s.id}
+                            id={s.id}
+                            label={s.label}
+                            count={sectorCounts[s.id] ?? 0}
+                            checked={sectorFilters.includes(s.id)}
+                            onToggle={(id) => toggleFilter(sectorFilters, setSectorFilters, id)}
                           />
                         ))}
                       </div>
@@ -825,8 +973,8 @@ export default function CareersPage() {
                       <>
                         Vị trí{' '}
                         <span className="font-semibold text-foreground">
-                          {(listPaged.page - 1) * pageSize + 1} –{' '}
-                          {Math.min(listPaged.page * pageSize, marketplaceJobs.length)}
+                          {(listPaged.page - 1) * PAGE_SIZE + 1} –{' '}
+                          {Math.min(listPaged.page * PAGE_SIZE, marketplaceJobs.length)}
                         </span>{' '}
                         của <span className="font-semibold text-foreground">{marketplaceJobs.length}</span> việc làm
                       </>
@@ -835,18 +983,6 @@ export default function CareersPage() {
                     )}
                   </p>
                   <div className="flex flex-wrap items-center gap-3">
-                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span>Hiển thị:</span>
-                      <select
-                        className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-                        value={String(pageSize)}
-                        onChange={(e) => setPageSize(Number(e.target.value))}
-                      >
-                        <option value="12">12</option>
-                        <option value="24">24</option>
-                        <option value="36">36</option>
-                      </select>
-                    </label>
                     <label className="flex items-center gap-2 text-sm text-muted-foreground">
                       <span>Sắp xếp:</span>
                       <select
@@ -859,37 +995,13 @@ export default function CareersPage() {
                         <option value="title">Theo tên A–Z</option>
                       </select>
                     </label>
-                    <div className="flex rounded-lg border border-input p-0.5">
-                      <button
-                        type="button"
-                        className={`rounded-md p-2 ${viewMode === 'grid' ? 'bg-[#e8f0fe] text-[#2b4a8c]' : 'text-muted-foreground'}`}
-                        aria-label="Lưới"
-                        onClick={() => setViewMode('grid')}
-                      >
-                        <LayoutGrid className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        className={`rounded-md p-2 ${viewMode === 'list' ? 'bg-[#e8f0fe] text-[#2b4a8c]' : 'text-muted-foreground'}`}
-                        aria-label="Danh sách"
-                        onClick={() => setViewMode('list')}
-                      >
-                        <List className="h-4 w-4" />
-                      </button>
-                    </div>
                   </div>
                 </div>
 
                 {listPaged.items.length ? (
-                  <div
-                    className={
-                      viewMode === 'grid'
-                        ? 'mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3'
-                        : 'mt-6 flex flex-col gap-4'
-                    }
-                  >
+                  <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     {listPaged.items.map((j) => (
-                      <MarketplaceJobCard key={j.id} job={j} viewMode={viewMode} />
+                      <MarketplaceJobCard key={j.id} job={j} />
                     ))}
                   </div>
                 ) : (
@@ -909,25 +1021,14 @@ export default function CareersPage() {
         </section>
 
         <section id="apply" className="border-t bg-white">
-          <div className="mx-auto max-w-6xl px-4 py-14">
-            <h2 className="text-center text-4xl font-extrabold tracking-tight">
+          <div className="mx-auto max-w-xl px-4 py-14">
+            <h2 className="text-center text-2xl font-bold tracking-tight text-foreground md:text-3xl">
               <span className="text-primary">Ứng</span> tuyển ngay
             </h2>
 
-            <div className="mt-10 grid grid-cols-1 gap-8 md:grid-cols-2">
-              <div className="overflow-hidden rounded-2xl border bg-muted/20">
-                {site?.heroBackgroundUrl ? (
-                  <img src={site.heroBackgroundUrl} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="grid aspect-[4/3] place-items-center text-sm text-muted-foreground">
-                    Ảnh (admin thêm ở Hero)
-                  </div>
-                )}
-              </div>
-
-              <form
-                className="rounded-2xl border bg-white p-6 shadow-sm"
-                onSubmit={async (e) => {
+            <form
+              className="mt-8 space-y-5 rounded-xl border border-border bg-white p-6 shadow-sm md:p-8"
+              onSubmit={async (e) => {
                   e.preventDefault()
                   try {
                     if (!applyName.trim()) throw new Error('Vui lòng nhập họ và tên')
@@ -937,8 +1038,15 @@ export default function CareersPage() {
                     if (!isValidCvFile(applyCvFile)) throw new Error('CV chỉ chấp nhận định dạng pdf/doc/docx')
                     if (applyCvFile.size > 10 * 1024 * 1024) throw new Error('CV tối đa 10MB')
                     if (!applyJobId) throw new Error('Vui lòng chọn vị trí')
+                    const picked = Number(applyJobId)
+                    if (picked === 0) {
+                      if (!applyCustomJobTitle.trim()) throw new Error('Vui lòng nhập vị trí mong muốn')
+                    } else if (!Number.isFinite(picked) || picked <= 0) {
+                      throw new Error('Vị trí không hợp lệ')
+                    }
                     const form = new FormData()
-                    form.append('jobId', String(applyJobId))
+                    form.append('jobId', String(picked))
+                    if (picked === 0) form.append('customJobTitle', applyCustomJobTitle.trim())
                     form.append('fullName', applyName)
                     form.append('email', applyEmail)
                     form.append('phone', applyPhone)
@@ -954,7 +1062,12 @@ export default function CareersPage() {
                     setApplyName('')
                     setApplyEmail('')
                     setApplyPhone('')
-                    setApplyJobId('')
+                    setApplyCustomJobTitle('')
+                    if (selectedJobId && jobs.some((j) => String(j?.id) === String(selectedJobId))) {
+                      setApplyJobId(String(selectedJobId))
+                    } else {
+                      setApplyJobId('')
+                    }
                     setApplyCvFile(null)
                     setApplySource('')
                   } catch (err) {
@@ -966,87 +1079,136 @@ export default function CareersPage() {
                     })
                   }
                 }}
-              >
-                <div className="space-y-4">
-                  <div>
-                    <div className="text-sm font-medium">Họ và tên *</div>
-                    <input
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                      value={applyName}
-                      onChange={(e) => setApplyName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">Email *</div>
-                    <input
-                      type="email"
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                      value={applyEmail}
-                      onChange={(e) => setApplyEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">Số điện thoại *</div>
-                    <input
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                      value={applyPhone}
-                      onChange={(e) => setApplyPhone(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">Vị trí *</div>
-                    <select
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                      value={applyJobId}
-                      onChange={(e) => setApplyJobId(e.target.value)}
-                      required
-                    >
-                      <option value="">Chọn vị trí</option>
-                      {jobs.map((j) => (
-                        <option key={j.id} value={String(j.id)}>
-                          {j.title}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">CV ứng tuyển *</div>
-                    <div className="mt-1 rounded-md border bg-muted/10 p-4 text-center">
-                      <div className="text-sm text-muted-foreground">
-                        Kéo thả hoặc tải lên CV của bạn
-                      </div>
-                      <div className="mt-3">
-                        <input
-                          type="file"
-                          accept=".pdf,.doc,.docx"
-                          onChange={(e) => setApplyCvFile(e.target.files?.[0] || null)}
-                          required
-                        />
-                        {applyCvFile ? (
-                          <div className="mt-2 text-xs text-muted-foreground">{applyCvFile.name}</div>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">Bạn biết đến thông tin tuyển dụng qua đâu?</div>
-                    <input
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                      value={applySource}
-                      onChange={(e) => setApplySource(e.target.value)}
-                      placeholder="Facebook, LinkedIn, bạn bè..."
-                    />
-                  </div>
-
-                  <Button type="submit" className="w-full bg-primary">
-                    Gửi ứng tuyển
+            >
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">CV ứng tuyển *</div>
+                <div
+                  className="mx-auto mt-2 max-w-md cursor-pointer rounded-xl border-2 border-dashed border-primary/45 bg-muted/5 px-4 py-8 text-center transition-colors hover:bg-muted/10"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => applyCvInputRef.current?.click()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      applyCvInputRef.current?.click()
+                    }
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    const f = e.dataTransfer.files?.[0]
+                    if (f && isValidCvFile(f)) setApplyCvFile(f)
+                  }}
+                >
+                  <input
+                    ref={applyCvInputRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    className="sr-only"
+                    onChange={(e) => setApplyCvFile(e.target.files?.[0] || null)}
+                  />
+                  <p className="text-sm font-semibold text-primary">Kéo thả hoặc tải lên CV của bạn</p>
+                  <p className="mt-1.5 text-xs text-muted-foreground">Chấp nhận file .pdf, .doc, .docx</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 border-primary/30 text-primary hover:bg-primary/5"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      applyCvInputRef.current?.click()
+                    }}
+                  >
+                    Chọn tệp
                   </Button>
+                  {applyCvFile ? (
+                    <p className="mt-3 text-xs font-medium text-foreground">{applyCvFile.name}</p>
+                  ) : (
+                    <p className="mt-3 text-xs text-muted-foreground">Chưa có tệp nào được chọn</p>
+                  )}
                 </div>
-              </form>
-            </div>
+              </div>
+
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Họ và tên *</div>
+                <input
+                  className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
+                  value={applyName}
+                  onChange={(e) => setApplyName(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Email *</div>
+                <input
+                  type="email"
+                  className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
+                  value={applyEmail}
+                  onChange={(e) => setApplyEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Số điện thoại *</div>
+                <input
+                  className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
+                  value={applyPhone}
+                  onChange={(e) => setApplyPhone(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Vị trí ứng tuyển *</div>
+                <select
+                  className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
+                  value={applyJobId}
+                  onChange={(e) => {
+                    setApplyJobId(e.target.value)
+                    if (e.target.value !== '0') setApplyCustomJobTitle('')
+                  }}
+                  required
+                >
+                  <option value="">Chọn vị trí</option>
+                  {jobs.map((j) => (
+                    <option key={j.id} value={String(j.id)}>
+                      {j.title}
+                    </option>
+                  ))}
+                  <option value="0">Khác</option>
+                </select>
+                {applyJobId === '0' ? (
+                  <div className="mt-4">
+                    <div className="text-sm font-medium text-muted-foreground">Vị trí mong muốn *</div>
+                    <input
+                      className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
+                      value={applyCustomJobTitle}
+                      onChange={(e) => setApplyCustomJobTitle(e.target.value)}
+                      placeholder="Nhập tên vị trí / công việc"
+                      required
+                    />
+                  </div>
+                ) : null}
+              </div>
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">
+                  Bạn biết đến thông tin tuyển dụng qua đâu?
+                </div>
+                <input
+                  className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
+                  value={applySource}
+                  onChange={(e) => setApplySource(e.target.value)}
+                  placeholder="Facebook, LinkedIn, bạn bè..."
+                />
+              </div>
+
+              <Button type="submit" className="w-full rounded-lg bg-primary py-2.5 font-semibold shadow-sm">
+                Gửi ứng tuyển
+              </Button>
+            </form>
           </div>
         </section>
 

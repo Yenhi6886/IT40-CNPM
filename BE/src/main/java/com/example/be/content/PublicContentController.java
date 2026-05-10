@@ -27,6 +27,12 @@ public class PublicContentController {
         return contentService.listPublicJobs();
     }
 
+    /** Chỉ các tin đang mở nhận hồ sơ (theo ngày & trạng thái xuất bản). */
+    @GetMapping("/jobs/open")
+    public List<JobPostingDto> jobsOpenForApplication() {
+        return contentService.listPublicJobsOpenForApplication();
+    }
+
     @GetMapping("/jobs/{id}")
     public JobPostingDto job(@PathVariable long id) {
         return contentService.getPublicJob(id);

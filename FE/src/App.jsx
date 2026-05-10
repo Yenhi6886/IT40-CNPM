@@ -49,6 +49,7 @@ export default function App() {
         <Route path="/admin/jobs" element={<AdminDashboard />} />
         <Route path="/admin/job-edit" element={<AdminDashboard />} />
         <Route path="/admin/cv" element={<AdminDashboard />} />
+        <Route path="/admin/cv/interview" element={<AdminDashboard />} />
         <Route path="/admin/jobs/:id" element={<AdminJobDetailPage />} />
       </Routes>
     </BrowserRouter>

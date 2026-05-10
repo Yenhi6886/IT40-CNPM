@@ -43,6 +43,18 @@ public class JobPosting {
     @Column(length = 200)
     private String salary;
 
+    /** {@code true} = thỏa thuận; khi đó min/max bỏ qua khi lọc. */
+    @Column(nullable = false)
+    private boolean salaryNegotiable = false;
+
+    /** Mức sàn lương (triệu VNĐ/tháng), phục vụ lọc — null nếu thỏa thuận hoặc tin cũ. */
+    @Column
+    private Integer salaryMinMillion;
+
+    /** Mức trần lương (triệu VNĐ/tháng). */
+    @Column
+    private Integer salaryMaxMillion;
+
     /** Số lượng cần tuyển (nullable = chưa khai báo). */
     @Column
     private Integer recruitmentHeadcount;
@@ -62,6 +74,10 @@ public class JobPosting {
 
     @Column(nullable = false)
     private boolean published = false;
+
+    /** Tin nổi bật (hot) — hiển thị tia sét vàng trên trang tuyển dụng. */
+    @Column(nullable = false)
+    private boolean hot = false;
 
     @Column(nullable = false)
     private int sortOrder = 0;

@@ -26,6 +26,10 @@ public class CvApplication {
     @Column(nullable = false, length = 200)
     private String jobTitle;
 
+    /** Snapshot từ job lúc ứng viên nộp (FULL_TIME, …); null/ALL = chưa gán cụ thể. */
+    @Column(length = 30)
+    private String workArrangement;
+
     @Column(nullable = false, length = 200)
     private String fullName;
 

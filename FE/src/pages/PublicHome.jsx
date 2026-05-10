@@ -14,7 +14,6 @@ import {
   ChevronRight,
   Gift,
   MapPin,
-  Sparkles,
 } from 'lucide-react'
 
 const NAVY = '#2b4a8c'
@@ -280,10 +279,6 @@ export default function PublicHome() {
 
             <div className="relative mx-auto flex min-h-[calc(100vh-56px)] max-w-6xl flex-col justify-center px-4 py-16 md:min-h-[calc(100vh-64px)] md:py-20">
               <div className="mx-auto max-w-4xl text-center">
-                <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-white/90 backdrop-blur-md">
-                  <Sparkles className="h-3.5 w-3.5 text-amber-300" aria-hidden />
-                  {companyName}
-                </div>
                 {site?.heroTitle ? (
                   <h1 className="text-balance text-4xl font-extrabold tracking-tight text-white drop-shadow-sm md:text-6xl md:leading-[1.08]">
                     {site.heroTitle}
@@ -338,7 +333,7 @@ export default function PublicHome() {
                         style={{ maxHeight: 'min(22rem, calc(100vh - 180px))' }}
                         onWheelCapture={(e) => e.stopPropagation()}
                       >
-                        {['Hà Nội', 'TP HCM', 'Hải Phòng', 'Đà Nẵng', 'Tokyo', 'Osaka'].map((x) => (
+                        {['Hà Nội', 'Đà Nẵng'].map((x) => (
                           <button
                             key={x}
                             type="button"
@@ -361,23 +356,6 @@ export default function PublicHome() {
                   >
                     Tìm kiếm
                   </Button>
-                </div>
-
-                <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-sm">
-                  <Link
-                    to="/careers"
-                    className="inline-flex items-center gap-2 font-semibold text-white/95 underline-offset-4 transition-colors hover:text-white hover:underline"
-                  >
-                    Cơ hội nghề nghiệp
-                    <ArrowRight className="h-4 w-4" aria-hidden />
-                  </Link>
-                  <span className="hidden text-white/40 sm:inline">·</span>
-                  <Link
-                    to="/benefits"
-                    className="text-white/75 transition-colors hover:text-white"
-                  >
-                    Quyền lợi
-                  </Link>
                 </div>
 
                 {error ? <p className="mt-4 text-sm text-red-300">Lỗi: {error}</p> : null}

@@ -91,10 +91,33 @@ public class ContentService {
         return jobRepo.findAllByPublishedTrueOrderBySortOrderAscIdDesc().stream().map(this::toDto).toList();
     }
 
+    /**
+     * Tin đã xuất bản và đang trong (hoặc không khai báo) khoảng thời gian nhận hồ sơ — dùng cho form ứng tuyển.
+     */
+    @Transactional(readOnly = true)
+    public List<JobPostingDto> listPublicJobsOpenForApplication() {
+        LocalDate today = LocalDate.now();
+        return jobRepo.findAllByPublishedTrueOrderBySortOrderAscIdDesc().stream()
+            .filter(j -> isAcceptingApplicationsOn(j, today))
+            .map(this::toDto)
+            .toList();
+    }
+
     @Transactional(readOnly = true)
     public JobPostingDto getPublicJob(long id) {
         JobPosting job = jobRepo.findById(id).orElseThrow(() -> new IllegalArgumentException("Job not found"));
         if (!job.isPublished()) throw new IllegalArgumentException("Job not found");
+        return toDto(job);
+    }
+
+    /** Giống {@link #getPublicJob} nhưng chỉ khi tin vẫn nhận hồ sơ (theo ngày bắt đầu / kết thúc). */
+    @Transactional(readOnly = true)
+    public JobPostingDto getPublicJobForApplication(long id) {
+        JobPosting job = jobRepo.findById(id).orElseThrow(() -> new IllegalArgumentException("Job not found"));
+        if (!job.isPublished()) throw new IllegalArgumentException("Job not found");
+        if (!isAcceptingApplicationsOn(job, LocalDate.now())) {
+            throw new IllegalArgumentException("Vị trí này hiện không nhận hồ sơ ứng tuyển.");
+        }
         return toDto(job);
     }
 
@@ -138,11 +161,37 @@ public class ContentService {
         job.setAddress(blankToNull(dto.address()));
         job.setJobType(blankToNull(dto.jobType()));
         job.setSalary(blankToNull(dto.salary()));
+        boolean negotiable = Boolean.TRUE.equals(dto.salaryNegotiable());
+        job.setSalaryNegotiable(negotiable);
+        if (negotiable) {
+            job.setSalaryMinMillion(null);
+            job.setSalaryMaxMillion(null);
+        } else {
+            Integer mi = dto.salaryMinMillion();
+            Integer ma = dto.salaryMaxMillion();
+            if (mi == null && ma == null) {
+                job.setSalaryMinMillion(null);
+                job.setSalaryMaxMillion(null);
+            } else if (mi != null && ma != null) {
+                if (mi < 0 || ma > 500 || mi > ma) {
+                    throw new IllegalArgumentException(
+                        "Mức lương không hợp lệ (0–500 triệu, mức \"từ\" ≤ \"đến\")."
+                    );
+                }
+                job.setSalaryMinMillion(mi);
+                job.setSalaryMaxMillion(ma);
+            } else {
+                throw new IllegalArgumentException(
+                    "Vui lòng nhập đủ mức lương từ và đến (triệu), hoặc chọn Thỏa thuận."
+                );
+            }
+        }
         job.setRecruitmentHeadcount(dto.recruitmentHeadcount());
         job.setWorkArrangement(blankToNull(dto.workArrangement()));
         job.setImageUrl(blankToNull(dto.imageUrl()));
         job.setDescription(nz(dto.description(), ""));
         job.setPublished(dto.published());
+        job.setHot(dto.hot());
         job.setSortOrder(dto.sortOrder());
     }
 
@@ -220,11 +269,15 @@ public class ContentService {
             j.getAddress(),
             j.getJobType(),
             j.getSalary(),
+            j.isSalaryNegotiable(),
+            j.getSalaryMinMillion(),
+            j.getSalaryMaxMillion(),
             j.getRecruitmentHeadcount(),
             j.getWorkArrangement(),
             j.getImageUrl(),
             j.getDescription(),
             j.isPublished(),
+            j.isHot(),
             j.getSortOrder()
         );
     }
@@ -250,6 +303,20 @@ public class ContentService {
             }
         } catch (DateTimeParseException ex) {
             throw new IllegalArgumentException("Invalid apply date value");
+        }
+    }
+
+    private boolean isAcceptingApplicationsOn(JobPosting job, LocalDate today) {
+        if (!job.isPublished()) return false;
+        String start = blankToNull(job.getApplyStartDate());
+        String end = blankToNull(job.getApplyEndDate());
+        if (start == null && end == null) return true;
+        try {
+            if (start != null && today.isBefore(LocalDate.parse(start))) return false;
+            if (end != null && today.isAfter(LocalDate.parse(end))) return false;
+            return true;
+        } catch (DateTimeParseException ex) {
+            return false;
         }
     }
 }
