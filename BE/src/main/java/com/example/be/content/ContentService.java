@@ -2,6 +2,8 @@ package com.example.be.content;
 
 import com.example.be.content.dto.JobPostingDto;
 import com.example.be.content.dto.SiteContentDto;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -128,8 +130,11 @@ public class ContentService {
 
     private void applyJob(JobPosting job, JobPostingDto dto) {
         job.setTitle(nz(dto.title(), ""));
-        job.setApplyStartDate(blankToNull(dto.applyStartDate()));
-        job.setApplyEndDate(blankToNull(dto.applyEndDate()));
+        String applyStart = blankToNull(dto.applyStartDate());
+        String applyEnd = blankToNull(dto.applyEndDate());
+        validateApplyDateOrder(applyStart, applyEnd);
+        job.setApplyStartDate(applyStart);
+        job.setApplyEndDate(applyEnd);
         job.setAddress(blankToNull(dto.address()));
         job.setJobType(blankToNull(dto.jobType()));
         job.setSalary(blankToNull(dto.salary()));
@@ -232,6 +237,20 @@ public class ContentService {
         if (v == null) return null;
         String t = v.trim();
         return t.isEmpty() ? null : t;
+    }
+
+    /** Both dates must be {@code yyyy-MM-dd} (already enforced on {@link JobPostingDto}); end ≥ start. */
+    private static void validateApplyDateOrder(String start, String end) {
+        if (start == null || end == null) return;
+        try {
+            LocalDate s = LocalDate.parse(start);
+            LocalDate e = LocalDate.parse(end);
+            if (e.isBefore(s)) {
+                throw new IllegalArgumentException("applyEndDate must be on or after applyStartDate");
+            }
+        } catch (DateTimeParseException ex) {
+            throw new IllegalArgumentException("Invalid apply date value");
+        }
     }
 }
 

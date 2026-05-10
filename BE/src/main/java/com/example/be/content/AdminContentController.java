@@ -30,7 +30,7 @@ public class AdminContentController {
     }
 
     @PutMapping("/site")
-    public SiteContentDto upsertSite(@RequestBody SiteContentDto dto) {
+    public SiteContentDto upsertSite(@Valid @RequestBody SiteContentDto dto) {
         return contentService.upsertSite(dto);
     }
 

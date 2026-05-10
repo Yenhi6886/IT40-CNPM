@@ -2,21 +2,112 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import DOMPurify from 'dompurify'
 import { publicApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Link } from 'react-router-dom'
 import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Toast from '@/components/Toast'
-import { BriefcaseBusiness, CalendarDays, MapPin } from 'lucide-react'
+import {
+  ArrowRight,
+  BriefcaseBusiness,
+  CircleDollarSign,
+  Clock,
+  LayoutGrid,
+  List,
+  MapPin,
+  Sparkles,
+  Zap,
+} from 'lucide-react'
 
-function safeJsonArray(text) {
-  try {
-    const v = JSON.parse(text || '[]')
-    return Array.isArray(v) ? v : []
-  } catch {
-    return []
+const WORK_ARRANGEMENT_LABELS = {
+  ALL: 'Tất cả',
+  FULL_TIME: 'Toàn thời gian',
+  PART_TIME: 'Bán thời gian',
+  INTERN: 'Thực tập',
+  COLLABORATOR: 'Cộng tác viên',
+}
+
+const SALARY_BUCKETS = [
+  { id: 'negotiable', label: 'Thỏa thuận / không rõ' },
+  { id: '0-10', label: '0 – 10 triệu' },
+  { id: '10-15', label: '10 – 15 triệu' },
+  { id: '15-20', label: '15 – 20 triệu' },
+  { id: '20-25', label: '20 – 25 triệu' },
+  { id: '25+', label: 'Trên 25 triệu' },
+]
+
+const LEVEL_FILTERS = [
+  { id: 'staff', label: 'Nhân viên' },
+  { id: 'manager', label: 'Quản lý' },
+]
+
+const WORK_TYPE_FILTERS = [
+  { id: 'FULL_TIME', label: 'Toàn thời gian' },
+  { id: 'PART_TIME', label: 'Bán thời gian' },
+  { id: 'INTERN', label: 'Thực tập' },
+  { id: 'COLLABORATOR', label: 'Cộng tác viên' },
+]
+
+const NAVY = '#2b4a8c'
+
+function workArrangementLabel(code) {
+  const k = String(code || '').toUpperCase()
+  return WORK_ARRANGEMENT_LABELS[k] || '—'
+}
+
+function formatCvDeadlineShort(iso) {
+  const s = String(iso || '').trim()
+  if (!s) return '—'
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`
+  return s.replaceAll('-', '/')
+}
+
+function shortLocation(address) {
+  const s = String(address || '').trim()
+  if (!s) return '—'
+  const parts = s.split(',').map((x) => x.trim()).filter(Boolean)
+  if (parts.length >= 2) return parts[parts.length - 1]
+  return s.length > 36 ? `${s.slice(0, 33)}…` : s
+}
+
+/** Gán bucket lương từ text (heuristic). */
+function getSalaryBucket(job) {
+  const raw = String(job?.salary || '').trim().toLowerCase()
+  if (!raw || /thỏa thuận|thương lượng|negotiat|deal|lương\s*cạnh/.test(raw)) return 'negotiable'
+  const nums = []
+  const re = /(\d+)\s*(?:triệu|tr\b|m\b)?/gi
+  let mm
+  while ((mm = re.exec(raw)) !== null) {
+    const n = Number(mm[1])
+    if (n >= 1 && n <= 500) nums.push(n)
   }
+  if (!nums.length) {
+    const plain = raw.match(/\d+/g)?.map(Number).filter((n) => n >= 5 && n <= 500) || []
+    nums.push(...plain)
+  }
+  if (!nums.length) return 'negotiable'
+  const mid = (Math.min(...nums) + Math.max(...nums)) / 2
+  if (mid <= 10) return '0-10'
+  if (mid <= 15) return '10-15'
+  if (mid <= 20) return '15-20'
+  if (mid <= 25) return '20-25'
+  return '25+'
+}
+
+function getJobLevel(job) {
+  const t = String(job?.title || '').toLowerCase()
+  if (/quản lý|manager|lead|director|head|trưởng|giám đốc|chief|supervisor/.test(t)) return 'manager'
+  return 'staff'
+}
+
+function countByBucket(jobs, fnBucket) {
+  const m = {}
+  for (const j of jobs || []) {
+    const k = fnBucket(j)
+    m[k] = (m[k] || 0) + 1
+  }
+  return m
 }
 
 function safeJsonObject(text, fallback) {
@@ -26,24 +117,6 @@ function safeJsonObject(text, fallback) {
   } catch {
     return fallback
   }
-}
-
-function LogoMark({ logoUrl, companyName }) {
-  if (logoUrl) {
-    return (
-      <img
-        src={logoUrl}
-        alt={companyName || 'Logo'}
-        className="h-10 w-10 rounded-md object-cover"
-      />
-    )
-  }
-  const letter = (companyName || 'S').trim().slice(0, 1).toUpperCase()
-  return (
-    <div className="grid h-10 w-10 place-items-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
-      {letter}
-    </div>
-  )
 }
 
 function renderJobDescription(value) {
@@ -78,18 +151,6 @@ function formatApplyRange(job) {
   if (!s && !e) return ''
   if (s && e) return `${s.replaceAll('-', '/')} - ${e.replaceAll('-', '/')}`
   return (s || e).replaceAll('-', '/')
-}
-
-function normalizeNavHref(href) {
-  const raw = String(href || '').trim()
-  if (!raw) return '/'
-  if (raw.startsWith('#')) {
-    const lower = raw.toLowerCase()
-    if (lower === '#home') return '/'
-    if (lower === '#careers') return '/careers'
-    return `/${raw}`
-  }
-  return raw
 }
 
 function isItJob(job) {
@@ -155,8 +216,13 @@ export default function CareersPage() {
   const [site, setSite] = useState(null)
   const [jobs, setJobs] = useState([])
   const [error, setError] = useState(null)
-  const [itPage, setItPage] = useState(1)
-  const [nonItPage, setNonItPage] = useState(1)
+  const [listPage, setListPage] = useState(1)
+  const [pageSize, setPageSize] = useState(12)
+  const [sortMode, setSortMode] = useState('newest') // newest | oldest | title
+  const [viewMode, setViewMode] = useState('grid') // grid | list
+  const [salaryFilters, setSalaryFilters] = useState([])
+  const [levelFilters, setLevelFilters] = useState([])
+  const [workFilters, setWorkFilters] = useState([])
   const [regionOpen, setRegionOpen] = useState(false)
   const [regionValue, setRegionValue] = useState('')
   const [jobKeyword, setJobKeyword] = useState('')
@@ -169,6 +235,7 @@ export default function CareersPage() {
   const [toast, setToast] = useState({ open: false })
   const [selectedJobId, setSelectedJobId] = useState(null)
   const detailRef = useRef(null)
+  const [careersHeroReady, setCareersHeroReady] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -186,6 +253,29 @@ export default function CareersPage() {
       cancelled = true
     }
   }, [])
+
+  const careersHeroBgUrl = String(site?.careersHeroBackgroundUrl || '').trim()
+
+  useEffect(() => {
+    if (!careersHeroBgUrl) {
+      setCareersHeroReady(false)
+      return
+    }
+    let cancelled = false
+    setCareersHeroReady(false)
+    const img = new Image()
+    img.src = careersHeroBgUrl
+    img.decoding = 'async'
+    img.onload = () => {
+      if (!cancelled) setCareersHeroReady(true)
+    }
+    img.onerror = () => {
+      if (!cancelled) setCareersHeroReady(true)
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [careersHeroBgUrl])
 
   useEffect(() => {
     const params = new URLSearchParams(location.search || '')
@@ -234,16 +324,69 @@ export default function CareersPage() {
     })
   }, [jobs, jobKeyword, regionValue])
 
-  const itJobs = useMemo(() => filteredJobs.filter(isItJob), [filteredJobs])
-  const nonItJobs = useMemo(() => filteredJobs.filter((j) => !isItJob(j)), [filteredJobs])
+  const salaryCounts = useMemo(() => countByBucket(filteredJobs, getSalaryBucket), [filteredJobs])
+  const levelCounts = useMemo(() => countByBucket(filteredJobs, getJobLevel), [filteredJobs])
+  const workCounts = useMemo(() => {
+    const m = {}
+    for (const j of filteredJobs || []) {
+      const k = String(j?.workArrangement || '').toUpperCase()
+      const key = !k || k === 'ALL' ? 'UNSPEC' : k
+      m[key] = (m[key] || 0) + 1
+    }
+    return m
+  }, [filteredJobs])
 
-  const itPaged = useMemo(() => paginate(itJobs, itPage, 6), [itJobs, itPage])
-  const nonItPaged = useMemo(() => paginate(nonItJobs, nonItPage, 6), [nonItJobs, nonItPage])
+  const marketplaceJobs = useMemo(() => {
+    let list = [...(filteredJobs || [])]
+
+    if (salaryFilters.length) {
+      list = list.filter((j) => salaryFilters.includes(getSalaryBucket(j)))
+    }
+    if (levelFilters.length) {
+      list = list.filter((j) => levelFilters.includes(getJobLevel(j)))
+    }
+    if (workFilters.length) {
+      list = list.filter((j) => {
+        const w = String(j?.workArrangement || '').toUpperCase()
+        if (!w || w === 'ALL') return true
+        return workFilters.includes(w)
+      })
+    }
+
+    list.sort((a, b) => {
+      if (sortMode === 'title') {
+        return String(a.title || '').localeCompare(String(b.title || ''), 'vi')
+      }
+      const sa = Number(a.sortOrder) || 0
+      const sb = Number(b.sortOrder) || 0
+      const ida = Number(a.id) || 0
+      const idb = Number(b.id) || 0
+      if (sortMode === 'oldest') {
+        if (sa !== sb) return sa - sb
+        return ida - idb
+      }
+      if (sa !== sb) return sb - sa
+      return idb - ida
+    })
+    return list
+  }, [filteredJobs, salaryFilters, levelFilters, workFilters, sortMode])
+
+  const listPaged = useMemo(() => paginate(marketplaceJobs, listPage, pageSize), [marketplaceJobs, listPage, pageSize])
 
   useEffect(() => {
-    setItPage(1)
-    setNonItPage(1)
-  }, [jobKeyword, regionValue])
+    setListPage(1)
+  }, [jobKeyword, regionValue, salaryFilters, levelFilters, workFilters, pageSize, sortMode])
+
+  function toggleFilter(arr, setArr, id) {
+    setArr((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  function resetAdvancedFilters() {
+    setSalaryFilters([])
+    setLevelFilters([])
+    setWorkFilters([])
+    setListPage(1)
+  }
 
   function applySearchFilters(nextKeyword = jobKeyword, nextRegion = regionValue) {
     const params = new URLSearchParams(location.search || '')
@@ -267,86 +410,125 @@ export default function CareersPage() {
     return () => document.removeEventListener('click', onDocClick)
   }, [])
 
-  function JobCard({ job }) {
-    return (
-      <Link to={`/careers/${job.id}`} className="block">
-        <Card className="h-full overflow-hidden border border-border/70 bg-white transition-colors hover:border-primary/40 hover:bg-primary/[0.03]">
-          <div className="grid h-full grid-cols-1 md:grid-cols-[180px_1fr]">
-            <div className="h-full border-b bg-muted/20 md:border-b-0 md:border-r">
-              {job.imageUrl || site?.logoUrl ? (
-                <img
-                  src={job.imageUrl || site?.logoUrl}
-                  alt={job.title || companyName}
-                  className="h-full min-h-24 w-full object-cover md:min-h-40"
-                />
-              ) : (
-                <div className="grid h-full min-h-24 place-items-center md:min-h-40">
-                  <LogoMark logoUrl={site?.logoUrl} companyName={companyName} />
-                </div>
-              )}
-            </div>
-            <div className="min-w-0">
-              <CardHeader className="p-3 pb-2 md:p-6 md:pb-2">
-                <div className="flex items-start justify-between gap-3">
-                  <CardTitle className="truncate text-sm md:text-lg">{job.title}</CardTitle>
-                  <span className="hidden shrink-0 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-medium text-primary md:inline-flex">
-                    Tuyển dụng
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-1 p-3 pt-0 text-xs text-muted-foreground md:space-y-2 md:p-6 md:pt-0 md:text-sm">
-                {formatApplyRange(job) ? (
-                  <div className="flex items-start gap-2">
-                    <CalendarDays className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/80 md:h-4 md:w-4" />
-                    <span className="leading-5">{formatApplyRange(job)}</span>
-                  </div>
-                ) : null}
-                {job.address ? (
-                  <div className="flex items-start gap-2">
-                    <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/80 md:h-4 md:w-4" />
-                    <span className="line-clamp-2 leading-5">{job.address}</span>
-                  </div>
-                ) : null}
-                <div className="flex items-start gap-2">
-                  <BriefcaseBusiness className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/80 md:h-4 md:w-4" />
-                  <span className="leading-5">{job.salary || 'Thỏa thuận'}</span>
-                </div>
-              </CardContent>
-            </div>
+  function MarketplaceJobCard({ job, viewMode }) {
+    const it = isItJob(job)
+    const salaryText = String(job?.salary || '').trim()
+    const negotiable = !salaryText || /thỏa thuận|thương lượng/i.test(salaryText)
+    const deadline = formatCvDeadlineShort(job.applyEndDate)
+
+    const inner = (
+      <>
+        <div className="flex items-start justify-between gap-2">
+          <Link
+            to={`/careers/${job.id}`}
+            className="line-clamp-2 min-w-0 flex-1 text-sm font-bold leading-snug text-[#2b4a8c] hover:underline md:text-[15px]"
+          >
+            {job.title}
+          </Link>
+          <Zap
+            className={`mt-0.5 h-5 w-5 shrink-0 ${it ? 'text-amber-500' : 'text-emerald-600'}`}
+            aria-hidden
+          />
+        </div>
+        <div className="mt-3 space-y-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <BriefcaseBusiness className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+            <span>{workArrangementLabel(job.workArrangement)}</span>
           </div>
-        </Card>
-      </Link>
+          <div className="flex items-center gap-2">
+            <MapPin className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+            <span className="line-clamp-1">{shortLocation(job.address)}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Clock className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+            <span>Thời hạn: {deadline}</span>
+          </div>
+        </div>
+        <div className="mt-auto mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[#e8e8e8] pt-3">
+          {negotiable ? (
+            <span className="text-sm text-muted-foreground">Lương thỏa thuận</span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-sm font-bold text-[#2b4a8c]">
+              <CircleDollarSign className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+              {salaryText}
+            </span>
+          )}
+          <Link
+            to={`/careers/${job.id}#apply`}
+            className="rounded-full border border-[#cfd8e6] bg-white px-3 py-1.5 text-xs font-semibold text-[#2b4a8c] transition-colors hover:border-[#2b4a8c]/40 hover:bg-[#f0f5fc]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            Ứng Tuyển
+          </Link>
+        </div>
+      </>
+    )
+
+    if (viewMode === 'list') {
+      return (
+        <div className="flex h-full flex-col rounded-xl border border-[#e0e0e0] bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-primary/30 md:flex-row md:items-stretch md:gap-6">
+          <div className="flex min-w-0 flex-1 flex-col">{inner}</div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex h-full flex-col rounded-xl border border-[#e0e0e0] bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-primary/30">
+        {inner}
+      </div>
     )
   }
 
-  function Pagination({ page, totalPages, onChange }) {
+  function MarketplacePagination({ page, totalPages, onChange }) {
     if (totalPages <= 1) return null
-    const pages = Array.from({ length: totalPages }, (_, i) => i + 1)
+    const pages = []
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i)
+    } else {
+      pages.push(1)
+      const start = Math.max(2, page - 2)
+      const end = Math.min(totalPages - 1, page + 2)
+      if (start > 2) pages.push('…')
+      for (let i = start; i <= end; i++) pages.push(i)
+      if (end < totalPages - 1) pages.push('…')
+      pages.push(totalPages)
+    }
+
     return (
-      <div className="mt-8 flex items-center justify-center gap-2 text-sm">
+      <div className="mt-10 flex flex-wrap items-center justify-center gap-1.5">
         <button
           type="button"
-          className="rounded-md px-2 py-1 text-muted-foreground hover:bg-muted/30 disabled:opacity-40"
+          className="rounded-full p-2 text-muted-foreground hover:bg-[#e8f0fe] disabled:opacity-35"
           disabled={page <= 1}
           onClick={() => onChange(page - 1)}
+          aria-label="Trang trước"
         >
           ‹
         </button>
-        {pages.map((p) => (
-          <button
-            key={p}
-            type="button"
-            className={`rounded-md px-3 py-1 ${p === page ? 'bg-primary/10 text-primary' : 'hover:bg-muted/30'}`}
-            onClick={() => onChange(p)}
-          >
-            {p}
-          </button>
-        ))}
+        {pages.map((p, idx) =>
+          p === '…' ? (
+            <span key={`e-${idx}`} className="px-2 text-muted-foreground">
+              …
+            </span>
+          ) : (
+            <button
+              key={p}
+              type="button"
+              className={`min-w-[2.25rem] rounded-full px-2 py-1.5 text-sm font-medium ${
+                p === page ? 'bg-[#e8f0fe] text-[#2b4a8c]' : 'text-foreground hover:bg-muted/50'
+              }`}
+              onClick={() => onChange(p)}
+            >
+              {p}
+            </button>
+          ),
+        )}
         <button
           type="button"
-          className="rounded-md px-2 py-1 text-muted-foreground hover:bg-muted/30 disabled:opacity-40"
+          className="rounded-full bg-[#e8f0fe] p-2 text-[#2b4a8c] hover:bg-[#dce8fc] disabled:opacity-35"
           disabled={page >= totalPages}
           onClick={() => onChange(page + 1)}
+          aria-label="Trang sau"
         >
           ›
         </button>
@@ -354,50 +536,88 @@ export default function CareersPage() {
     )
   }
 
+  function FilterCheckboxRow({ id, label, count, checked, onToggle }) {
+    return (
+      <label className="flex cursor-pointer items-center justify-between gap-2 rounded-lg py-1.5 text-sm hover:bg-muted/30">
+        <span className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-input accent-[#2b4a8c]"
+            checked={checked}
+            onChange={() => onToggle(id)}
+          />
+          <span className="text-foreground/90">{label}</span>
+        </span>
+        <span className="rounded-full bg-[#e8f0fe] px-2 py-0.5 text-xs font-medium text-[#2b4a8c]">{count}</span>
+      </label>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-[#f5f6f8] text-foreground [--careers-page-bg:#f5f6f8]">
       <Toast toast={toast} onClose={() => setToast({ open: false })} />
       <SiteHeader site={site} />
 
       <main>
-        <section
-          className="relative"
-          style={
-            site?.careersHeroBackgroundUrl
-              ? {
-                  backgroundImage: `url(${site?.careersHeroBackgroundUrl})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                }
-              : undefined
-          }
-        >
-          <div className="absolute inset-0 bg-black/25" />
-          <div className="relative mx-auto flex min-h-[calc(100vh-56px)] max-w-6xl items-center px-4 py-10 md:min-h-[calc(100vh-64px)]">
-            <div className="mx-auto max-w-3xl text-center text-white">
-              {site?.careersHeroTitle ? (
-                <h1 className="text-balance text-5xl font-bold tracking-tight md:text-7xl">
-                  {site?.careersHeroTitle}
+        <section className="relative isolate overflow-hidden bg-[#0c1929]">
+          {careersHeroBgUrl ? (
+            <img
+              src={careersHeroBgUrl}
+              alt=""
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
+                careersHeroReady ? 'opacity-100' : 'opacity-0'
+              }`}
+            />
+          ) : (
+            <div
+              className="absolute inset-0 opacity-95"
+              style={{
+                background: `linear-gradient(135deg, #0f2744 0%, ${NAVY} 45%, #1a5080 100%)`,
+              }}
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/35 to-[#0c1929]/95" />
+          <div
+            className="pointer-events-none absolute -right-24 top-1/4 h-96 w-96 rounded-full opacity-30 blur-3xl"
+            style={{ background: `radial-gradient(circle, ${NAVY} 0%, transparent 70%)` }}
+          />
+          <div className="pointer-events-none absolute -left-16 bottom-1/4 h-72 w-72 rounded-full opacity-25 blur-3xl bg-sky-400/40" />
+
+          <div className="relative mx-auto flex min-h-[calc(100vh-56px)] max-w-6xl flex-col justify-center px-4 py-16 md:min-h-[calc(100vh-64px)] md:py-20">
+            <div className="mx-auto max-w-4xl text-center">
+              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-white/90 backdrop-blur-md">
+                <Sparkles className="h-3.5 w-3.5 text-amber-300" aria-hidden />
+                {companyName}
+              </div>
+              {String(site?.careersHeroTitle || '').trim() ? (
+                <h1 className="text-balance text-4xl font-extrabold tracking-tight text-white drop-shadow-sm md:text-6xl md:leading-[1.08]">
+                  {site.careersHeroTitle}
                 </h1>
-              ) : null}
+              ) : (
+                <h1 className="text-balance text-4xl font-extrabold tracking-tight text-white drop-shadow-sm md:text-6xl md:leading-[1.08]">
+                  Tham gia cùng chúng tôi — phát huy tiềm năng của bạn
+                </h1>
+              )}
               {site?.careersHeroSubtitle ? (
-                <p className="mt-4 text-balance text-lg text-white/80 md:text-xl">
+                <div className="mx-auto mt-5 max-w-3xl text-balance text-base leading-relaxed text-white/85 md:text-lg">
                   <span
-                    className="block"
+                    className="careers-hero-sub [&_a]:text-sky-200 [&_a]:underline [&_a]:underline-offset-2 [&_p]:m-0 [&_p+p]:mt-3"
                     dangerouslySetInnerHTML={{
                       __html: renderRichHtml(site?.careersHeroSubtitle),
                     }}
                   />
-                </p>
+                </div>
               ) : null}
-          
-         
-              <div className="mx-auto mt-8 grid w-full max-w-5xl grid-cols-1 gap-3 rounded-2xl border border-white/20 bg-white/95 p-4 md:grid-cols-[1.5fr_1.25fr_auto]">
-                <div className="flex items-center gap-2 rounded-lg border bg-white px-3 text-sm text-muted-foreground">
+
+              <div className="mx-auto mt-10 grid w-full max-w-5xl grid-cols-1 gap-3 rounded-2xl border border-white/25 bg-white/[0.12] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.25)] backdrop-blur-xl md:grid-cols-[1.5fr_1.25fr_auto]">
+                <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/95 px-3 text-sm text-muted-foreground shadow-sm">
                   <span className="hidden whitespace-nowrap sm:inline">Công việc</span>
                   <input
-                    className="h-11 w-full bg-transparent text-foreground outline-none"
-                    placeholder="Tìm công việc"
+                    className="h-11 w-full bg-transparent text-foreground outline-none placeholder:text-muted-foreground/80"
+                    placeholder="Tìm công việc phù hợp…"
                     aria-label="Tìm công việc"
                     value={jobKeyword}
                     onChange={(e) => setJobKeyword(e.target.value)}
@@ -406,7 +626,10 @@ export default function CareersPage() {
                     }}
                   />
                 </div>
-                <div className="relative flex items-center gap-2 rounded-lg border bg-white px-3 text-sm text-muted-foreground" data-region-dropdown>
+                <div
+                  className="relative flex items-center gap-2 rounded-xl border border-white/20 bg-white/95 px-3 text-sm text-muted-foreground shadow-sm"
+                  data-region-dropdown
+                >
                   <span className="hidden whitespace-nowrap sm:inline">Khu vực</span>
                   <button
                     type="button"
@@ -414,7 +637,9 @@ export default function CareersPage() {
                     onClick={() => setRegionOpen((v) => !v)}
                     aria-label="Chọn khu vực"
                   >
-                    <span className={`whitespace-nowrap ${regionValue ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    <span
+                      className={`whitespace-nowrap ${regionValue ? 'text-foreground' : 'text-muted-foreground'}`}
+                    >
                       {regionValue || 'Tìm theo khu vực'}
                     </span>
                     <span className="text-muted-foreground">▾</span>
@@ -425,11 +650,11 @@ export default function CareersPage() {
                       style={{ maxHeight: 'min(22rem, calc(100vh - 180px))' }}
                       onWheelCapture={(e) => e.stopPropagation()}
                     >
-                      {['Hà Nội', 'TP HCM', 'Hải Phòng', 'Tokyo', 'Osaka', 'Đà Nẵng'].map((x) => (
+                      {['Hà Nội', 'TP HCM', 'Hải Phòng', 'Đà Nẵng', 'Tokyo', 'Osaka'].map((x) => (
                         <button
                           key={x}
                           type="button"
-                          className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted/40"
+                          className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-[#e8f0fe]/80"
                           onClick={() => {
                             setRegionValue(x)
                             setRegionOpen(false)
@@ -443,16 +668,47 @@ export default function CareersPage() {
                   ) : null}
                 </div>
                 <Button
-                  className="h-11 rounded-lg px-5"
-                  aria-label="Search"
+                  className="h-11 rounded-xl bg-[#2b4a8c] px-6 font-semibold text-white shadow-lg shadow-[#2b4a8c]/25 hover:bg-[#223d73]"
+                  aria-label="Tìm kiếm"
                   onClick={() => applySearchFilters(jobKeyword, regionValue)}
                 >
                   Tìm kiếm
                 </Button>
               </div>
 
-              {error ? <p className="mt-4 text-sm text-red-200">Lỗi: {error}</p> : null}
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-sm">
+                <a
+                  href="#jobs"
+                  className="inline-flex items-center gap-2 font-semibold text-white/95 underline-offset-4 transition-colors hover:text-white hover:underline"
+                >
+                  Cơ hội nghề nghiệp
+                  <ArrowRight className="h-4 w-4" aria-hidden />
+                </a>
+                <span className="hidden text-white/40 sm:inline">·</span>
+                <Link
+                  to="/benefits"
+                  className="text-white/75 transition-colors hover:text-white"
+                >
+                  Quyền lợi
+                </Link>
+              </div>
+
+              {error ? <p className="mt-4 text-sm text-red-300">Lỗi: {error}</p> : null}
             </div>
+          </div>
+
+          <div className="relative h-16 w-full overflow-hidden md:h-20">
+            <svg
+              className="absolute bottom-0 left-0 w-full text-[var(--careers-page-bg)]"
+              viewBox="0 0 1440 120"
+              preserveAspectRatio="none"
+              aria-hidden
+            >
+              <path
+                fill="currentColor"
+                d="M0,64L60,58.7C120,53,240,43,360,48C480,53,600,75,720,74.7C840,75,960,53,1080,42.7C1200,32,1320,32,1380,32L1440,32L1440,120L1380,120C1320,120,1200,120,1080,120C960,120,840,120,720,120C600,120,480,120,360,120C240,120,120,120,60,120L0,120Z"
+              />
+            </svg>
           </div>
         </section>
 
@@ -492,49 +748,163 @@ export default function CareersPage() {
           </section>
         ) : null}
 
-        <section id="jobs" className="border-t bg-white">
-          <div className="mx-auto max-w-6xl px-4 py-14">
-            <h2 className="text-center text-4xl font-extrabold tracking-tight">
-              <span className="text-foreground">VỊ TRÍ</span> <span className="text-primary">IT</span>
-            </h2>
+        <section id="jobs" className="border-t bg-[#f5f6f8]">
+          <div className="mx-auto max-w-[1320px] px-4 py-10 lg:py-12">
+            <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+              {/* Sidebar — bộ lọc nâng cao */}
+              <aside className="w-full shrink-0 lg:w-[280px] xl:w-[300px]">
+                <div className="sticky top-24 rounded-xl border border-[#e0e0e0] bg-white p-5 shadow-sm">
+                  <div className="flex items-center justify-between gap-2 border-b border-[#e8e8e8] pb-4">
+                    <h2 className="text-base font-bold text-[#2b4a8c]">Bộ lọc nâng cao</h2>
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-primary hover:underline"
+                      onClick={resetAdvancedFilters}
+                    >
+                      Đặt lại
+                    </button>
+                  </div>
 
-            {itJobs.length ? (
-              <>
-                <div className="mt-10 grid grid-cols-2 gap-3 md:gap-6">
-                  {itPaged.items.map((j) => (
-                    <JobCard key={j.id} job={j} />
-                  ))}
+                  <div className="mt-5 space-y-6">
+                    <div>
+                      <div className="mb-3 text-sm font-bold text-[#2b4a8c]">Mức lương</div>
+                      <div className="space-y-0.5">
+                        {SALARY_BUCKETS.map((b) => (
+                          <FilterCheckboxRow
+                            key={b.id}
+                            id={b.id}
+                            label={b.label}
+                            count={salaryCounts[b.id] ?? 0}
+                            checked={salaryFilters.includes(b.id)}
+                            onToggle={(id) => toggleFilter(salaryFilters, setSalaryFilters, id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="mb-3 text-sm font-bold text-[#2b4a8c]">Vị trí</div>
+                      <div className="space-y-0.5">
+                        {LEVEL_FILTERS.map((lv) => (
+                          <FilterCheckboxRow
+                            key={lv.id}
+                            id={lv.id}
+                            label={lv.label}
+                            count={levelCounts[lv.id] ?? 0}
+                            checked={levelFilters.includes(lv.id)}
+                            onToggle={(id) => toggleFilter(levelFilters, setLevelFilters, id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="mb-3 text-sm font-bold text-[#2b4a8c]">Loại hình công việc</div>
+                      <div className="space-y-0.5">
+                        {WORK_TYPE_FILTERS.map((wt) => (
+                          <FilterCheckboxRow
+                            key={wt.id}
+                            id={wt.id}
+                            label={wt.label}
+                            count={workCounts[wt.id] ?? 0}
+                            checked={workFilters.includes(wt.id)}
+                            onToggle={(id) => toggleFilter(workFilters, setWorkFilters, id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <Pagination page={itPaged.page} totalPages={itPaged.totalPages} onChange={setItPage} />
-              </>
-            ) : (
-              <div className="mt-8 rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
-                Chưa có job IT.
-              </div>
-            )}
-          </div>
-        </section>
+              </aside>
 
-        <section className="border-t">
-          <div className="mx-auto max-w-6xl px-4 py-14">
-            <h2 className="text-center text-4xl font-extrabold tracking-tight">
-              <span className="text-foreground">VỊ TRÍ</span> <span className="text-primary">NON-IT</span>
-            </h2>
-
-            {nonItJobs.length ? (
-              <>
-                <div className="mt-10 grid grid-cols-2 gap-3 md:gap-6">
-                  {nonItPaged.items.map((j) => (
-                    <JobCard key={j.id} job={j} />
-                  ))}
+              {/* Main — danh sách */}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-col gap-4 rounded-xl border border-[#e0e0e0] bg-white p-4 shadow-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {marketplaceJobs.length ? (
+                      <>
+                        Vị trí{' '}
+                        <span className="font-semibold text-foreground">
+                          {(listPaged.page - 1) * pageSize + 1} –{' '}
+                          {Math.min(listPaged.page * pageSize, marketplaceJobs.length)}
+                        </span>{' '}
+                        của <span className="font-semibold text-foreground">{marketplaceJobs.length}</span> việc làm
+                      </>
+                    ) : (
+                      <span>Không có việc làm phù hợp.</span>
+                    )}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>Hiển thị:</span>
+                      <select
+                        className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                        value={String(pageSize)}
+                        onChange={(e) => setPageSize(Number(e.target.value))}
+                      >
+                        <option value="12">12</option>
+                        <option value="24">24</option>
+                        <option value="36">36</option>
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>Sắp xếp:</span>
+                      <select
+                        className="h-9 min-w-[9rem] rounded-md border border-input bg-background px-2 text-sm"
+                        value={sortMode}
+                        onChange={(e) => setSortMode(e.target.value)}
+                      >
+                        <option value="newest">Mới nhất</option>
+                        <option value="oldest">Cũ nhất</option>
+                        <option value="title">Theo tên A–Z</option>
+                      </select>
+                    </label>
+                    <div className="flex rounded-lg border border-input p-0.5">
+                      <button
+                        type="button"
+                        className={`rounded-md p-2 ${viewMode === 'grid' ? 'bg-[#e8f0fe] text-[#2b4a8c]' : 'text-muted-foreground'}`}
+                        aria-label="Lưới"
+                        onClick={() => setViewMode('grid')}
+                      >
+                        <LayoutGrid className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        className={`rounded-md p-2 ${viewMode === 'list' ? 'bg-[#e8f0fe] text-[#2b4a8c]' : 'text-muted-foreground'}`}
+                        aria-label="Danh sách"
+                        onClick={() => setViewMode('list')}
+                      >
+                        <List className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <Pagination page={nonItPaged.page} totalPages={nonItPaged.totalPages} onChange={setNonItPage} />
-              </>
-            ) : (
-              <div className="mt-8 rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
-                Chưa có job Non-IT.
+
+                {listPaged.items.length ? (
+                  <div
+                    className={
+                      viewMode === 'grid'
+                        ? 'mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3'
+                        : 'mt-6 flex flex-col gap-4'
+                    }
+                  >
+                    {listPaged.items.map((j) => (
+                      <MarketplaceJobCard key={j.id} job={j} viewMode={viewMode} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-8 rounded-xl border border-dashed border-[#e0e0e0] bg-white p-8 text-center text-sm text-muted-foreground">
+                    Chưa có tin tuyển dụng phù hợp. Thử đổi bộ lọc hoặc từ khóa tìm kiếm.
+                  </div>
+                )}
+
+                <MarketplacePagination
+                  page={listPaged.page}
+                  totalPages={listPaged.totalPages}
+                  onChange={setListPage}
+                />
               </div>
-            )}
+            </div>
           </div>
         </section>
 

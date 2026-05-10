@@ -212,6 +212,15 @@ export default function AdminDashboard() {
     { title: 'NHẬT BẢN', address: '', phone: '', email: '' },
     { title: 'SINGAPORE', address: '', phone: '', email: '' },
   ])
+  const [footerContactHeading, setFooterContactHeading] = useState('Trung tâm Thu hút Nguồn nhân lực')
+  const [footerCopyright, setFooterCopyright] = useState('')
+  const [footerSocialSubtitle, setFooterSocialSubtitle] = useState('')
+  const [footerSupportEmail, setFooterSupportEmail] = useState('')
+  const [footerHotline, setFooterHotline] = useState('')
+  const [footerSocFacebook, setFooterSocFacebook] = useState('')
+  const [footerSocYoutube, setFooterSocYoutube] = useState('')
+  const [footerSocInstagram, setFooterSocInstagram] = useState('')
+  const [footerSocZalo, setFooterSocZalo] = useState('')
   const [benefitsList, setBenefitsList] = useState([])
   const [rightsList, setRightsList] = useState([])
   const [benefitsCards, setBenefitsCards] = useState([
@@ -397,15 +406,31 @@ export default function AdminDashboard() {
         }
 
         const fParsed = safeJson(s?.footerJson, null)
-        if (fParsed && typeof fParsed === 'object' && !Array.isArray(fParsed) && Array.isArray(fParsed.offices)) {
-          setFooterOffices(
-            fParsed.offices.map((o) => ({
-              title: String(o?.title || ''),
-              address: String(o?.address || ''),
-              phone: String(o?.phone || ''),
-              email: String(o?.email || ''),
-            })),
-          )
+        if (fParsed && typeof fParsed === 'object' && !Array.isArray(fParsed)) {
+          if (typeof fParsed.contactHeading === 'string') setFooterContactHeading(fParsed.contactHeading)
+          if (typeof fParsed.copyright === 'string') setFooterCopyright(fParsed.copyright)
+          const sb = fParsed.socialBar && typeof fParsed.socialBar === 'object' ? fParsed.socialBar : null
+          if (sb) {
+            if (typeof sb.subtitle === 'string') setFooterSocialSubtitle(sb.subtitle)
+            if (typeof sb.supportEmail === 'string') setFooterSupportEmail(sb.supportEmail)
+            if (typeof sb.hotline === 'string') setFooterHotline(sb.hotline)
+            const links = Array.isArray(sb.links) ? sb.links : []
+            const hrefOf = (t) => String(links.find((x) => x?.type === t)?.href || '').trim()
+            setFooterSocFacebook(hrefOf('facebook'))
+            setFooterSocYoutube(hrefOf('youtube'))
+            setFooterSocInstagram(hrefOf('instagram'))
+            setFooterSocZalo(hrefOf('zalo'))
+          }
+          if (Array.isArray(fParsed.offices)) {
+            setFooterOffices(
+              fParsed.offices.map((o) => ({
+                title: String(o?.title || ''),
+                address: String(o?.address || ''),
+                phone: String(o?.phone || ''),
+                email: String(o?.email || ''),
+              })),
+            )
+          }
         }
 
         setBenefitsList(listFromJsonArray(s?.benefitsJson))
@@ -596,6 +621,19 @@ export default function AdminDashboard() {
           })),
         }),
         footerJson: JSON.stringify({
+          contactHeading: String(footerContactHeading || '').trim(),
+          copyright: String(footerCopyright || '').trim(),
+          socialBar: {
+            subtitle: String(footerSocialSubtitle || '').trim(),
+            supportEmail: String(footerSupportEmail || '').trim(),
+            hotline: String(footerHotline || '').trim(),
+            links: [
+              { type: 'facebook', href: String(footerSocFacebook || '').trim() },
+              { type: 'youtube', href: String(footerSocYoutube || '').trim() },
+              { type: 'instagram', href: String(footerSocInstagram || '').trim() },
+              { type: 'zalo', href: String(footerSocZalo || '').trim() },
+            ].filter((x) => x.href),
+          },
           offices: (footerOffices || []).map((o) => ({
             title: String(o.title || '').trim(),
             address: String(o.address || '').trim(),
@@ -631,11 +669,21 @@ export default function AdminDashboard() {
     setError(null)
     setNotice(null)
     try {
+      const start = jobDraft.applyStartDate?.trim() || null
+      const end = jobDraft.applyEndDate?.trim() || null
+      if (start && end && start > end) {
+        throw new Error('Ngày kết thúc nhận hồ sơ phải sau hoặc trùng ngày bắt đầu.')
+      }
+      const sortOrderRaw = Number(jobDraft.sortOrder)
+      const sortOrder = Number.isFinite(sortOrderRaw)
+        ? Math.min(100_000, Math.max(0, Math.floor(sortOrderRaw)))
+        : 0
+
       const dto = {
         ...jobDraft,
         imageUrl: jobDraft.imageUrl || null,
-        applyStartDate: jobDraft.applyStartDate || null,
-        applyEndDate: jobDraft.applyEndDate || null,
+        applyStartDate: start,
+        applyEndDate: end,
         address: jobDraft.address || null,
         jobType: jobDraft.jobType || null,
         salary: jobDraft.salary || null,
@@ -645,6 +693,7 @@ export default function AdminDashboard() {
           return Math.floor(n)
         })(),
         workArrangement: jobDraft.workArrangement || null,
+        sortOrder,
       }
       if (dto.id) {
         const updated = await adminApi.updateJob(token, dto.id, dto)
@@ -1591,8 +1640,81 @@ export default function AdminDashboard() {
                       <Card>
                         <CardHeader>
                           <CardTitle className="text-base">Footer</CardTitle>
+                          <CardDescription>
+                            Layout 4 cột + thanh mạng xã hội (giống mẫu). Liên kết menu mặc định trên site; chỉnh nội dung
+                            liên hệ và URL MXH tại đây.
+                          </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
+                          <div className="grid grid-cols-1 gap-4 rounded-xl border bg-muted/20 p-4 md:grid-cols-2">
+                            <div className="space-y-2 md:col-span-2">
+                              <div className="text-xs font-medium text-muted-foreground">Tiêu đề cột liên hệ</div>
+                              <Input
+                                value={footerContactHeading}
+                                onChange={(e) => setFooterContactHeading(e.target.value)}
+                                placeholder="Trung tâm Thu hút Nguồn nhân lực"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <div className="text-xs font-medium text-muted-foreground">Email hỗ trợ (thanh dưới)</div>
+                              <Input
+                                value={footerSupportEmail}
+                                onChange={(e) => setFooterSupportEmail(e.target.value)}
+                                placeholder="Để trống = lấy từ chi nhánh đầu có email"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <div className="text-xs font-medium text-muted-foreground">Hotline (thanh dưới)</div>
+                              <Input
+                                value={footerHotline}
+                                onChange={(e) => setFooterHotline(e.target.value)}
+                                placeholder="Để trống = lấy từ chi nhánh đầu có SĐT"
+                              />
+                            </div>
+                            <div className="space-y-2 md:col-span-2">
+                              <div className="text-xs font-medium text-muted-foreground">
+                                Dòng phụ dưới “Theo dõi các kênh…” (vd: của Savytech)
+                              </div>
+                              <Input
+                                value={footerSocialSubtitle}
+                                onChange={(e) => setFooterSocialSubtitle(e.target.value)}
+                                placeholder="Để trống — hiển thị “của …” + tên công ty"
+                              />
+                            </div>
+                            <div className="space-y-2 md:col-span-2">
+                              <div className="text-xs font-medium text-muted-foreground">Copyright (một dòng)</div>
+                              <Input
+                                value={footerCopyright}
+                                onChange={(e) => setFooterCopyright(e.target.value)}
+                                placeholder="Để trống = mặc định theo năm + tên công ty"
+                              />
+                            </div>
+                            <div className="space-y-2 md:col-span-2">
+                              <div className="text-xs font-semibold text-foreground">Liên kết mạng xã hội</div>
+                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <Input
+                                  value={footerSocFacebook}
+                                  onChange={(e) => setFooterSocFacebook(e.target.value)}
+                                  placeholder="Facebook URL"
+                                />
+                                <Input
+                                  value={footerSocYoutube}
+                                  onChange={(e) => setFooterSocYoutube(e.target.value)}
+                                  placeholder="YouTube URL"
+                                />
+                                <Input
+                                  value={footerSocInstagram}
+                                  onChange={(e) => setFooterSocInstagram(e.target.value)}
+                                  placeholder="Instagram URL"
+                                />
+                                <Input
+                                  value={footerSocZalo}
+                                  onChange={(e) => setFooterSocZalo(e.target.value)}
+                                  placeholder="Zalo URL"
+                                />
+                              </div>
+                            </div>
+                          </div>
                           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             {footerOffices
                               .slice(

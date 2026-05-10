@@ -6,7 +6,12 @@ import { Button } from '@/components/ui/button'
 import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
 import Toast from '@/components/Toast'
-import { CalendarDays, CircleDollarSign, Clock, MapPin, Users } from 'lucide-react'
+import { BriefcaseBusiness, CalendarDays, CircleDollarSign, Clock, MapPin, Users } from 'lucide-react'
+
+const JOB_INFO_TITLE = '#002b5c'
+const JOB_INFO_LABEL = '#6c757d'
+const JOB_INFO_VALUE = '#212529'
+const JOB_INFO_BORDER = '#e0e0e0'
 
 const WORK_ARRANGEMENT_LABELS = {
   ALL: 'Tất cả',
@@ -27,6 +32,15 @@ function formatCvDeadline(iso) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
   if (m) return `${m[3]}/${m[2]}/${m[1]}`
   return s.replaceAll('-', '/')
+}
+
+/** Gợi ý địa điểm hiển thị ngắn (vd. lấy phần sau cùng sau dấu phẩy). */
+function shortLocation(address) {
+  const s = String(address || '').trim()
+  if (!s) return '—'
+  const parts = s.split(',').map((x) => x.trim()).filter(Boolean)
+  if (parts.length >= 2) return parts[parts.length - 1]
+  return s.length > 48 ? `${s.slice(0, 45)}…` : s
 }
 
 function renderRichHtml(value) {
@@ -68,6 +82,7 @@ export default function JobDetailPage() {
   const jobId = Number(id)
   const [site, setSite] = useState(null)
   const [job, setJob] = useState(null)
+  const [publicJobs, setPublicJobs] = useState([])
   const [error, setError] = useState(null)
 
   const [applyName, setApplyName] = useState('')
@@ -80,11 +95,23 @@ export default function JobDetailPage() {
   useEffect(() => {
     let cancelled = false
     setError(null)
-    Promise.all([publicApi.site(), Number.isFinite(jobId) ? publicApi.job(jobId) : Promise.reject(new Error('Job not found'))])
+    Promise.all([
+      publicApi.site(),
+      Number.isFinite(jobId) ? publicApi.job(jobId) : Promise.reject(new Error('Job not found')),
+    ])
       .then(([s, j]) => {
         if (cancelled) return
         setSite(s)
         setJob(j)
+        publicApi
+          .jobs()
+          .then((list) => {
+            if (cancelled) return
+            setPublicJobs(Array.isArray(list) ? list : [])
+          })
+          .catch(() => {
+            if (!cancelled) setPublicJobs([])
+          })
       })
       .catch((e) => {
         if (cancelled) return
@@ -99,38 +126,64 @@ export default function JobDetailPage() {
 
   const descriptionHtml = useMemo(() => renderRichHtml(job?.description), [job?.description])
 
+  const relatedJobs = useMemo(() => {
+    if (!job?.id || !publicJobs.length) return []
+    const currentId = Number(job.id)
+    const myType = String(job.jobType || 'IT').toUpperCase()
+    const others = publicJobs.filter((x) => Number(x?.id) !== currentId)
+    const sameType = others.filter((x) => String(x?.jobType || 'IT').toUpperCase() === myType)
+    const pool = sameType.length >= 2 ? sameType : others
+    return pool.slice(0, 5)
+  }, [job, publicJobs])
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Toast toast={toast} onClose={() => setToast({ open: false })} />
       <SiteHeader site={site} />
 
       <main>
-        <section className="border-b bg-muted/10">
-          <div className="mx-auto max-w-6xl px-4 py-8">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="text-sm text-muted-foreground">
-                <Link className="hover:text-primary" to="/careers">
-                  Cơ hội nghề nghiệp
-                </Link>{' '}
-                / <span className="text-foreground">{job?.title || 'Chi tiết'}</span>
-              </div>
-              <Button asChild variant="outline">
+        <section className="border-b border-border/60 bg-muted/10">
+          <div className="mx-auto max-w-6xl px-4 py-2">
+            <nav className="text-xs text-muted-foreground md:text-sm">
+              <Link className="transition-colors hover:text-primary" to="/careers">
+                Cơ hội nghề nghiệp
+              </Link>
+            </nav>
+            {error ? <div className="mt-2 text-sm text-destructive">Lỗi: {error}</div> : null}
+          </div>
+        </section>
+
+        {job ? (
+          <section className="border-b border-border/60 bg-white">
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 md:py-5">
+              <h1 className="text-balance text-xl font-bold tracking-tight text-foreground md:text-2xl">
+                {job.title}
+              </h1>
+              <Button asChild variant="outline" className="shrink-0">
                 <a href="#apply">Ứng tuyển ngay</a>
               </Button>
             </div>
-            {error ? <div className="mt-4 text-sm text-destructive">Lỗi: {error}</div> : null}
-          </div>
-        </section>
+          </section>
+        ) : null}
 
         {job ? (
           <section className="bg-white">
             <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-4 py-10 lg:grid-cols-[1fr_360px]">
               <div className="rounded-2xl border bg-white p-6">
-                <div className="mb-8 overflow-hidden rounded-xl border border-border/80 bg-white">
-                  <div className="border-b border-border/70 px-5 py-4">
-                    <h2 className="text-base font-bold text-primary">Thông tin công việc</h2>
+                <div
+                  className="mb-8 overflow-hidden rounded-lg bg-white"
+                  style={{ border: `1px solid ${JOB_INFO_BORDER}` }}
+                >
+                  <div className="px-6 pb-4 pt-6">
+                    <h2
+                      className="text-base font-bold tracking-tight"
+                      style={{ color: JOB_INFO_TITLE }}
+                    >
+                      Thông tin công việc
+                    </h2>
                   </div>
-                  <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 sm:gap-4">
+                  <div className="border-t" style={{ borderColor: JOB_INFO_BORDER }} />
+                  <div className="grid grid-cols-1 gap-x-10 gap-y-8 px-6 py-6 sm:grid-cols-2">
                     {[
                       {
                         icon: Users,
@@ -146,14 +199,14 @@ export default function JobDetailPage() {
                         value: job.salary?.trim() ? job.salary : '—',
                       },
                       {
-                        icon: Clock,
+                        icon: BriefcaseBusiness,
                         label: 'Loại hình',
                         value: workArrangementLabel(job.workArrangement),
                       },
                       {
                         icon: MapPin,
                         label: 'Địa điểm',
-                        value: job.address?.trim() ? job.address : '—',
+                        value: job.address?.trim() ? shortLocation(job.address) : '—',
                       },
                       {
                         icon: CalendarDays,
@@ -163,17 +216,27 @@ export default function JobDetailPage() {
                     ].map((row) => {
                       const RowIcon = row.icon
                       return (
-                      <div
-                        key={row.label}
-                        className="flex gap-3 rounded-lg border border-border/50 bg-muted/10 px-4 py-3"
-                      >
-                        <RowIcon className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm text-muted-foreground">{row.label}</div>
-                          <div className="mt-0.5 text-sm font-semibold text-foreground">{row.value}</div>
+                        <div key={row.label} className="flex gap-3">
+                          <RowIcon
+                            className="mt-0.5 h-5 w-5 shrink-0 opacity-70"
+                            style={{ color: JOB_INFO_LABEL }}
+                            strokeWidth={1.75}
+                            aria-hidden
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm leading-snug" style={{ color: JOB_INFO_LABEL }}>
+                              {row.label}
+                            </div>
+                            <div
+                              className="mt-1.5 text-sm font-semibold leading-snug"
+                              style={{ color: JOB_INFO_VALUE }}
+                            >
+                              {row.value}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    )})}
+                      )
+                    })}
                   </div>
                 </div>
 
@@ -184,25 +247,81 @@ export default function JobDetailPage() {
                 )}
               </div>
 
-              <aside className="rounded-2xl border bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-center rounded-xl bg-muted/20 p-6">
-                  {site?.logoUrl ? (
-                    <img src={site.logoUrl} alt={companyName} className="h-20 object-contain" />
-                  ) : (
-                    <div className="text-2xl font-bold text-primary">{companyName}</div>
-                  )}
+              <aside className="space-y-6">
+                <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                  <div className="flex items-center justify-center rounded-xl bg-muted/20 p-6">
+                    {site?.logoUrl ? (
+                      <img src={site.logoUrl} alt={companyName} className="h-20 object-contain" />
+                    ) : (
+                      <div className="text-2xl font-bold text-primary">{companyName}</div>
+                    )}
+                  </div>
+
+                  <div className="mt-6 text-lg font-semibold">{job.title}</div>
+                  <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+                    {formatApplyRange(job) ? (
+                      <div className="flex items-start gap-2">
+                        <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 opacity-80" aria-hidden />
+                        <span>{formatApplyRange(job)}</span>
+                      </div>
+                    ) : null}
+                    {job.address ? (
+                      <div className="flex items-start gap-2">
+                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 opacity-80" aria-hidden />
+                        <span className="min-w-0">{job.address}</span>
+                      </div>
+                    ) : null}
+                    <div className="flex items-start gap-2">
+                      <CircleDollarSign className="mt-0.5 h-4 w-4 shrink-0 opacity-80" aria-hidden />
+                      <span>{job.salary || 'Thỏa thuận'}</span>
+                    </div>
+                  </div>
+
+                  <Button asChild className="mt-6 w-full bg-primary">
+                    <a href="#apply">Ứng tuyển ngay</a>
+                  </Button>
                 </div>
 
-                <div className="mt-6 text-lg font-semibold">{job.title}</div>
-                <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-                  {formatApplyRange(job) ? <div>🕒 {formatApplyRange(job)}</div> : null}
-                  {job.address ? <div>📍 {job.address}</div> : null}
-                  <div>💼 {job.salary || 'Thỏa thuận'}</div>
-                </div>
-
-                <Button asChild className="mt-6 w-full bg-primary">
-                  <a href="#apply">Ứng tuyển ngay</a>
-                </Button>
+                {relatedJobs.length ? (
+                  <div className="rounded-2xl border border-border/80 bg-white shadow-sm">
+                    <div className="border-b border-border/70 px-5 py-4">
+                      <h2 className="text-base font-bold text-primary">Công việc liên quan</h2>
+                    </div>
+                    <ul className="divide-y divide-border/60 px-2 py-2">
+                      {relatedJobs.map((rj) => (
+                        <li key={rj.id} className="list-none">
+                          <Link
+                            to={`/careers/${rj.id}`}
+                            className="group block cursor-pointer rounded-xl px-3 py-4 transition-all duration-300 ease-out hover:-translate-y-1 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+                          >
+                            <div className="line-clamp-2 text-sm font-bold leading-snug text-primary group-hover:underline">
+                              {rj.title}
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+                              <span className="inline-flex items-center gap-1.5">
+                                <BriefcaseBusiness className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                                {workArrangementLabel(rj.workArrangement)}
+                              </span>
+                              <span className="inline-flex items-center gap-1.5">
+                                <MapPin className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                                {shortLocation(rj.address)}
+                              </span>
+                            </div>
+                            <div className="mt-3 flex items-start justify-between gap-3">
+                              <span className="text-sm font-semibold text-primary">
+                                {rj.salary?.trim() ? rj.salary : 'Lương thỏa thuận'}
+                              </span>
+                              <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                                <Clock className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                                <span>Thời hạn: {formatCvDeadline(rj.applyEndDate)}</span>
+                              </span>
+                            </div>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
               </aside>
             </div>
           </section>
