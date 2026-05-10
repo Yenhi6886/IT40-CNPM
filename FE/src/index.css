@@ -63,6 +63,16 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  html {
+    overflow-x: clip;
+  }
+
+  #root {
+    min-height: 100dvh;
+    width: 100%;
+    overflow-x: clip;
+  }
 }
 
 .ql-toolbar.ql-snow {
@@ -137,6 +147,33 @@
 .job-rich-content ul,
 .job-rich-content blockquote {
   margin-bottom: 0.75rem;
+}
+
+/* CMS / Quill: tránh tràn ngang trên mobile & tablet */
+.job-rich-content img,
+.job-rich-content video,
+.job-rich-content iframe,
+.home-hero-sub img,
+.benefits-hero-sub img,
+.careers-hero-sub img,
+.ql-editor img {
+  max-width: 100%;
+  height: auto;
+}
+
+.job-rich-content table,
+.ql-editor table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.job-rich-content pre,
+.ql-editor pre {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .job-rich-content ul,

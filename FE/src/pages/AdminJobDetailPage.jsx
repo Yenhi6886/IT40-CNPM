@@ -29,7 +29,7 @@ export default function AdminJobDetailPage() {
   const { id } = useParams()
   const jobId = Number(id)
   const nav = useNavigate()
-  const token = useMemo(() => getToken(), [])
+  const token = getToken()
   const [site, setSite] = useState(null)
   const [job, setJob] = useState(null)
   const [error, setError] = useState(null)
@@ -70,12 +70,12 @@ export default function AdminJobDetailPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b bg-background/70 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-          <div>
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4">
+          <div className="min-w-0">
             <div className="text-sm text-muted-foreground">Admin</div>
-            <div className="text-lg font-semibold">{companyName}</div>
+            <div className="truncate text-lg font-semibold">{companyName}</div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" asChild>
               <Link to="/admin/jobs">Quay lại</Link>
             </Button>

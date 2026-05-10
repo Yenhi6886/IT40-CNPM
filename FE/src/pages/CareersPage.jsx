@@ -795,7 +795,7 @@ export default function CareersPage() {
                   <span className="hidden whitespace-nowrap sm:inline">Khu vực</span>
                   <button
                     type="button"
-                    className="flex h-11 w-full items-center justify-between gap-2 bg-transparent text-left text-foreground outline-none"
+                    className="flex h-11 min-w-0 w-full items-center justify-between gap-2 bg-transparent text-left text-foreground outline-none"
                     onClick={() => {
                       setRegionOpen((v) => !v)
                       setJobTitleOpen(false)
@@ -803,7 +803,7 @@ export default function CareersPage() {
                     aria-label="Chọn khu vực"
                   >
                     <span
-                      className={`whitespace-nowrap ${regionValue ? 'text-foreground' : 'text-muted-foreground'}`}
+                      className={`min-w-0 truncate ${regionValue ? 'text-foreground' : 'text-muted-foreground'}`}
                     >
                       {regionValue || 'Tìm theo khu vực'}
                     </span>

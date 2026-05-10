@@ -148,6 +148,9 @@ public class ContentService {
 
     @Transactional
     public void deleteJob(long id) {
+        if (!jobRepo.existsById(id)) {
+            throw new IllegalArgumentException("Job not found");
+        }
         jobRepo.deleteById(id);
     }
 

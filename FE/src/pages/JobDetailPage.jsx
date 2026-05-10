@@ -160,7 +160,7 @@ export default function JobDetailPage() {
         {job ? (
           <section className="border-b border-border/60 bg-white">
             <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 md:py-5">
-              <h1 className="text-balance text-xl font-bold tracking-tight text-foreground md:text-2xl">
+              <h1 className="min-w-0 max-w-full text-balance text-xl font-bold tracking-tight text-foreground md:text-2xl">
                 {job.title}
               </h1>
               <Button asChild variant="outline" className="shrink-0">
@@ -172,8 +172,8 @@ export default function JobDetailPage() {
 
         {job ? (
           <section className="bg-white">
-            <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-4 py-10 lg:grid-cols-[1fr_360px]">
-              <div className="rounded-2xl border bg-white p-6">
+            <div className="mx-auto grid min-w-0 max-w-6xl grid-cols-1 gap-8 px-4 py-10 lg:grid-cols-[minmax(0,1fr)_360px]">
+              <div className="min-w-0 rounded-2xl border bg-white p-6">
                 <div
                   className="mb-8 overflow-hidden rounded-lg bg-white"
                   style={{ border: `1px solid ${JOB_INFO_BORDER}` }}
@@ -251,7 +251,7 @@ export default function JobDetailPage() {
                 )}
               </div>
 
-              <aside className="space-y-6">
+              <aside className="min-w-0 space-y-6 lg:max-w-none">
                 <div className="rounded-2xl border bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-center rounded-xl bg-muted/20 p-6">
                     {site?.logoUrl ? (

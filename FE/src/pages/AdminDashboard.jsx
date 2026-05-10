@@ -716,7 +716,7 @@ export default function AdminDashboard() {
   const initialUiState = loadAdminUiState()
   const nav = useNavigate()
   const location = useLocation()
-  const token = useMemo(() => getToken(), [])
+  const token = getToken()
   const [site, setSite] = useState(null)
   const [jobs, setJobs] = useState([])
   const [jobDraft, setJobDraft] = useState(defaultJob())
@@ -1593,8 +1593,8 @@ export default function AdminDashboard() {
             aria-hidden
           />
         ) : null}
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-          <div className="flex min-w-0 items-center gap-3">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4">
+          <div className="flex min-w-0 flex-1 basis-[min(100%,16rem)] items-center gap-3 sm:flex-initial">
             {hrChrome ? (
               <div
                 className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white shadow-lg shadow-[#2b4a8c]/25"
@@ -1619,7 +1619,7 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
             <Button
               variant="outline"
               className={
@@ -1685,7 +1685,9 @@ export default function AdminDashboard() {
           </div>
         ) : null}
 
-        <div className={`grid grid-cols-1 gap-6 ${hrChrome ? 'lg:grid-cols-[268px_1fr] lg:gap-8' : 'lg:grid-cols-[240px_1fr]'}`}>
+        <div
+          className={`grid min-w-0 grid-cols-1 gap-6 ${hrChrome ? 'lg:grid-cols-[268px_minmax(0,1fr)] lg:gap-8' : 'lg:grid-cols-[240px_minmax(0,1fr)]'}`}
+        >
           <aside
             className={`h-fit rounded-2xl border p-3 lg:sticky lg:top-24 ${
               hrChrome
@@ -1746,7 +1748,7 @@ export default function AdminDashboard() {
             </div>
           </aside>
 
-          <section className="space-y-4">
+          <section className="min-w-0 space-y-4">
             {error ? (
               <div
                 className={`border p-4 text-sm text-destructive ${

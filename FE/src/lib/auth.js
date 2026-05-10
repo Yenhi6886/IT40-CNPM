@@ -18,10 +18,14 @@ function decodeJwtPayload(token) {
 }
 
 export function getRole() {
-  const stored = localStorage.getItem(ROLE_KEY)
-  if (stored) return stored
   const payload = decodeJwtPayload(getToken())
-  return payload?.role || ''
+  const fromJwt = payload?.role != null ? String(payload.role).trim() : ''
+  const stored = localStorage.getItem(ROLE_KEY) || ''
+  /** JWT là nguồn đúng; tránh UI HR + token DESIGN → 403 */
+  if (fromJwt && fromJwt !== stored) {
+    localStorage.setItem(ROLE_KEY, fromJwt)
+  }
+  return fromJwt || stored
 }
 
 /** ADMIN (JWT/DB cũ) hiển thị như DESIGN. */
@@ -41,6 +45,10 @@ export function setToken(token) {
   if (!token) {
     localStorage.removeItem(KEY)
     localStorage.removeItem(ROLE_KEY)
-  } else localStorage.setItem(KEY, token)
+  } else {
+    localStorage.setItem(KEY, token)
+    const r = decodeJwtPayload(token)?.role
+    if (r) localStorage.setItem(ROLE_KEY, String(r))
+  }
 }
 

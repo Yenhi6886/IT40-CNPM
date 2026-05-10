@@ -45,17 +45,21 @@ export default function SiteHeader({ site }) {
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/30 bg-white/60 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-white/45">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-        <Link to="/" className="flex items-center gap-3">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:gap-3">
+        <Link to="/" className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3 sm:flex-initial">
           {site?.logoUrl ? (
-            <img src={site.logoUrl} alt={companyName} className="h-8 w-8 rounded-md object-cover" />
+            <img
+              src={site.logoUrl}
+              alt={companyName}
+              className="h-8 w-8 shrink-0 rounded-md object-cover"
+            />
           ) : (
-            <div className="grid h-8 w-8 place-items-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
               {(companyName || 'S').trim().slice(0, 1).toUpperCase()}
             </div>
           )}
-          <div className="leading-tight">
-            <div className="bg-gradient-to-r from-sky-600 via-cyan-500 to-blue-600 bg-clip-text text-xl font-extrabold tracking-tight text-transparent md:text-2xl">
+          <div className="min-w-0 flex-1 leading-tight sm:flex-initial">
+            <div className="truncate bg-gradient-to-r from-sky-600 via-cyan-500 to-blue-600 bg-clip-text text-lg font-extrabold tracking-tight text-transparent sm:text-xl md:text-2xl">
               {companyName}
             </div>
           </div>
@@ -73,16 +77,17 @@ export default function SiteHeader({ site }) {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <Link
             to="/careers#apply"
-            className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-[#32a6e8] px-5 py-2.5 text-[14px] font-medium leading-none text-white shadow-[0_2px_10px_rgba(50,166,232,0.28)] transition-colors hover:bg-[#2d9cdd] md:px-7 md:py-3 md:text-[15px]"
+            className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-[#32a6e8] px-3 py-2.5 text-[13px] font-medium leading-none text-white shadow-[0_2px_10px_rgba(50,166,232,0.28)] transition-colors hover:bg-[#2d9cdd] min-[400px]:px-5 min-[400px]:text-[14px] md:px-7 md:py-3 md:text-[15px]"
           >
-            Ứng tuyển ngay
+            <span className="min-[400px]:hidden">Ứng tuyển</span>
+            <span className="hidden min-[400px]:inline">Ứng tuyển ngay</span>
           </Link>
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background/80 text-foreground md:hidden"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md border bg-background/80 text-foreground touch-manipulation md:hidden"
             aria-label={mobileMenuOpen ? 'Đóng menu' : 'Mở menu'}
             onClick={() => setMobileMenuOpen((v) => !v)}
           >

@@ -138,7 +138,7 @@ function OfficeBlock({ title, address, tel, hotline, email }) {
           <div className="text-[11px] font-medium uppercase tracking-wide" style={{ color: FOOTER_LABEL }}>
             Địa chỉ
           </div>
-          <p className="m-0 mt-1">{address}</p>
+          <p className="m-0 mt-1 break-words">{address}</p>
         </div>
         {tel ? (
           <div>
@@ -205,7 +205,7 @@ export default function SiteFooter({ site }) {
   const companyLegalName =
     String(
       footer?.companyLegalName ||
-        'CÔNG TY TNHH KINH DOANH VÀ GIẢI PHÁP CÔNG NGHỆ SAVYTECH',
+        'CÔNG TY TNHH SAVYTECH',
     ).trim()
 
   const offices = useMemo(() => normalizeOffices(footer?.offices), [footer?.offices])
@@ -246,10 +246,12 @@ export default function SiteFooter({ site }) {
                 className="h-11 w-11 shrink-0 rounded-[10px] object-contain"
                 decoding="async"
               />
-              <span className="text-[1.35rem] font-bold tracking-wide text-white">{brandName}</span>
+              <span className="min-w-0 break-words text-[1.35rem] font-bold tracking-wide text-white">
+                {brandName}
+              </span>
             </div>
             <p className="mt-2 text-sm text-white/90">{tagline}</p>
-            <p className="mt-5 text-[11px] font-medium uppercase leading-relaxed tracking-wide text-white/75">
+            <p className="mt-5 break-words text-[11px] font-medium uppercase leading-relaxed tracking-wide text-white/75">
               {companyLegalName}
             </p>
           </div>
@@ -270,7 +272,7 @@ export default function SiteFooter({ site }) {
         type="button"
         aria-label="Về đầu trang"
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        className={`fixed bottom-6 right-6 z-50 grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-[#2b4a8c] text-white shadow-lg transition-all duration-200 hover:bg-[#223d73] ${
+        className={`fixed z-50 grid h-11 w-11 touch-manipulation place-items-center rounded-full border border-white/20 bg-[#2b4a8c] text-white shadow-lg transition-all duration-200 hover:bg-[#223d73] max-[380px]:bottom-4 max-[380px]:right-4 bottom-[max(1.5rem,env(safe-area-inset-bottom,0px))] right-[max(1.5rem,env(safe-area-inset-right,0px))] ${
           showScrollTop ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
         }`}
       >
